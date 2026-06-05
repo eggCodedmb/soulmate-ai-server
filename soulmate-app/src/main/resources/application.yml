@@ -1,0 +1,114 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: soulmate-ai
+
+  # 虚拟线程（Java 21）
+  threads:
+    virtual:
+      enabled: true
+
+  # 数据源
+  datasource:
+    url: jdbc:postgresql://localhost:5432/soulmate
+    username: postgres
+    password: 123456
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      idle-timeout: 300000
+      max-lifetime: 1800000
+
+  # Redis
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      database: 0
+      timeout: 5000ms
+      lettuce:
+        pool:
+          max-active: 16
+          max-idle: 8
+          min-idle: 2
+
+  # Jackson
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: Asia/Shanghai
+    default-property-inclusion: non_null
+
+  # 邮件服务
+  mail:
+    host: smtp.qq.com
+    port: 587
+    username: 1542608903@qq.com
+    password: yhmfoqepklkhgdac
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
+  # Spring AI 配置（mimo-v2.5-pro，OpenAI 兼容 API）
+  ai:
+    openai:
+      api-key: tp-srq4w8k0i7ru68o0r2dhwi84qu6y0q4r9zpplhkirc02yibp
+      base-url: https://token-plan-sgp.xiaomimimo.com
+      chat:
+        options:
+          model: mimo-v2.5-pro
+          temperature: 0.7
+          max-tokens: 2048
+
+# MyBatis-Plus
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    db-config:
+      id-type: assign_id
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+  mapper-locations: classpath*:mapper/**/*.xml
+
+# SoulMate 自定义配置
+soulmate:
+  jwt:
+    secret: soulmate-ai-jwt-secret-key-must-be-32bytes-long!
+    expire-ms: 604800000  # 7天
+
+  limits:
+    free-daily-messages: 30
+    free-max-companions: 1
+
+  ai:
+    default-model: mimo-v2.5-pro
+    api-key: ${MIMO_API_KEY:your-api-key-here}
+    base-url: https://token-plan-sgp.xiaomimimo.com/v1
+    temperature: 0.7
+    max-tokens: 2048
+
+# Actuator
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: when-authorized
+
+# 日志
+logging:
+  level:
+    com.soulmate: DEBUG
+    org.springframework.ai: DEBUG
+    org.springframework.web.client: DEBUG
+    org.apache.hc.client5: INFO

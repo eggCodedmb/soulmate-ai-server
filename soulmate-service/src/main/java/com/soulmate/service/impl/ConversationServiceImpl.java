@@ -1,0 +1,173 @@
+package com.soulmate.service.impl;
+
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.soulmate.common.exception.BizException;
+import com.soulmate.common.response.ResultCode;
+import com.soulmate.domain.entity.*;
+import com.soulmate.domain.enums.*;
+import com.soulmate.mapper.*;
+import com.soulmate.service.ConversationService;
+import com.soulmate.service.SubscriptionService;
+import com.soulmate.service.ChatService;
+import com.soulmate.domain.dto.ChatRequest;
+import com.soulmate.domain.dto.ChatResponse;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import reactor.core.publisher.Flux;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+import static com.soulmate.common.constant.RedisConstants.COMPANION_CONTEXT;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class ConversationServiceImpl implements ConversationService {
+
+    private final ConversationMapper conversationMapper;
+    private final MessageMapper messageMapper;
+    private final CompanionMapper companionMapper;
+    private final StringRedisTemplate redisTemplate;
+    private final ChatService chatService;
+    private final SubscriptionService subscriptionService;
+
+    @Override
+    @Transactional
+    public Conversation getOrCreateConversation(Long userId, Long companionId) {
+        Conversation existing = conversationMapper.selectOne(
+                new LambdaQueryWrapper<Conversation>()
+                        .eq(Conversation::getUserId, userId)
+                        .eq(Conversation::getCompanionId, companionId)
+                        .eq(Conversation::getDeleted, 0));
+        if (existing != null) {
+            return existing;
+        }
+
+        Conversation conversation = new Conversation();
+        conversation.setUserId(userId);
+        conversation.setCompanionId(companionId);
+        conversation.setSceneMode(SceneMode.DAILY);
+        conversation.setUnreadCount(0);
+        conversation.setPinned(0);
+        conversation.setContextWindow(50);
+        conversation.setCreateTime(LocalDateTime.now());
+        conversation.setUpdateTime(LocalDateTime.now());
+        conversationMapper.insert(conversation);
+        return conversation;
+    }
+
+    @Override
+    public List<Conversation> getUserConversations(Long userId) {
+        return conversationMapper.selectList(
+                new LambdaQueryWrapper<Conversation>()
+                        .eq(Conversation::getUserId, userId)
+                        .eq(Conversation::getDeleted, 0)
+                        .orderByDesc(Conversation::getPinned)
+                        .orderByDesc(Conversation::getLastMessageTime));
+    }
+
+    @Override
+    public List<Message> getHistoryMessages(Long conversationId, int page, int size) {
+        return messageMapper.selectPage(
+                new Page<>(page, size),
+                new LambdaQueryWrapper<Message>()
+                        .eq(Message::getConversationId, conversationId)
+                        .eq(Message::getDeleted, 0)
+                        .orderByDesc(Message::getCreateTime))
+                .getRecords();
+    }
+
+    @Override
+    @Transactional
+    public Flux<ChatResponse> sendMessage(Long userId, ChatRequest request) {
+        // 检查消息限制
+        if (!subscriptionService.checkDailyMessageLimit(userId)) {
+            return Flux.just(ChatResponse.builder()
+                    .error(ResultCode.DAILY_MESSAGE_LIMIT.getMessage())
+                    .done(true)
+                    .build());
+        }
+
+        Conversation conversation = conversationMapper.selectById(request.getConversationId());
+        if (conversation == null || !conversation.getUserId().equals(userId)) {
+            return Flux.just(ChatResponse.builder()
+                    .error(ResultCode.CONVERSATION_NOT_FOUND.getMessage())
+                    .done(true)
+                    .build());
+        }
+
+        // 保存用户消息
+        Message userMessage = new Message();
+        userMessage.setConversationId(conversation.getId());
+        userMessage.setSenderType(SenderType.USER);
+        userMessage.setContent(request.getContent());
+        userMessage.setContentType(ContentType.valueOf(request.getContentType().toUpperCase()));
+        userMessage.setReadStatus(1);
+        userMessage.setCreateTime(LocalDateTime.now());
+        messageMapper.insert(userMessage);
+
+        // 更新会话
+        conversation.setLastMessagePreview(
+                request.getContent().length() > 100
+                        ? request.getContent().substring(0, 100) + "..."
+                        : request.getContent());
+        conversation.setLastMessageTime(LocalDateTime.now());
+        conversationMapper.updateById(conversation);
+
+        // 增加消息计数
+        subscriptionService.incrementDailyMessageCount(userId);
+
+        // 获取伴侣信息
+        Companion companion = companionMapper.selectById(request.getCompanionId());
+
+        // 调用 AI 服务流式生成回复
+        return chatService.streamChat(userId, conversation, companion, request.getContent())
+                .doOnComplete(() -> log.info("AI回复完成: conversationId={}", conversation.getId()));
+    }
+
+    @Override
+    @Transactional
+    public Message sendMessageSync(Long userId, ChatRequest request) {
+        Conversation conversation = conversationMapper.selectById(request.getConversationId());
+        if (conversation == null || !conversation.getUserId().equals(userId)) {
+            throw new BizException(ResultCode.CONVERSATION_NOT_FOUND);
+        }
+
+        // 保存用户消息
+        Message userMessage = new Message();
+        userMessage.setConversationId(conversation.getId());
+        userMessage.setSenderType(SenderType.USER);
+        userMessage.setContent(request.getContent());
+        userMessage.setContentType(ContentType.TEXT);
+        userMessage.setReadStatus(1);
+        userMessage.setCreateTime(LocalDateTime.now());
+        messageMapper.insert(userMessage);
+
+        // 获取伴侣信息并调用AI
+        Companion companion = companionMapper.selectById(request.getCompanionId());
+        String aiReply = chatService.chatSync(userId, conversation, companion, request.getContent());
+
+        // 保存AI回复
+        Message aiMessage = new Message();
+        aiMessage.setConversationId(conversation.getId());
+        aiMessage.setSenderType(SenderType.COMPANION);
+        aiMessage.setContent(aiReply);
+        aiMessage.setContentType(ContentType.TEXT);
+        aiMessage.setReadStatus(0);
+        aiMessage.setCreateTime(LocalDateTime.now());
+        messageMapper.insert(aiMessage);
+
+        // 更新会话
+        conversation.setLastMessagePreview(
+                aiReply.length() > 100 ? aiReply.substring(0, 100) + "..." : aiReply);
+        conversation.setLastMessageTime(LocalDateTime.now());
+        conversationMapper.updateById(conversation);
+
+        return aiMessage;
+    }
+}
