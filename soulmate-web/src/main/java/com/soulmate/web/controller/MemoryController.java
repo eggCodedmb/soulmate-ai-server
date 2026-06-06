@@ -1,17 +1,17 @@
 package com.soulmate.web.controller;
 
 import com.soulmate.common.response.R;
-import com.soulmate.domain.entity.*;
+import com.soulmate.domain.dto.MemoryDTO;
+import com.soulmate.domain.entity.Memory;
 import com.soulmate.domain.enums.MemoryCategory;
 import com.soulmate.service.MemoryService;
-import com.soulmate.service.SubscriptionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 /**
- * 记忆控制器
+ * 记忆管理接口
  */
 @RestController
 @RequestMapping("/api/memory")
@@ -21,17 +21,27 @@ public class MemoryController {
     private final MemoryService memoryService;
 
     /**
-     * 获取记忆列表
+     * 获取记忆列表 (支持过滤)
      */
     @GetMapping("/list")
-    public R<List<Memory>> getMemories(@RequestAttribute("currentUserId") Long userId,
-                                        @RequestParam(required = false) Long companionId,
-                                        @RequestParam(required = false) MemoryCategory category) {
-        return R.ok(memoryService.getUserMemories(userId, companionId, category));
+    public R<List<MemoryDTO>> getMemories(@RequestAttribute("currentUserId") Long userId,
+                                           @RequestParam(required = false) Long companionId,
+                                           @RequestParam(required = false) MemoryCategory category) {
+        return R.ok(memoryService.listMemories(userId, companionId, category));
     }
 
     /**
-     * 编辑记忆
+     * 手动创建记忆
+     */
+    @PostMapping
+    public R<Void> createMemory(@RequestAttribute("currentUserId") Long userId,
+                                 @RequestBody Memory memory) {
+        memoryService.saveMemory(userId, memory);
+        return R.ok();
+    }
+
+    /**
+     * 更新记忆
      */
     @PutMapping("/{id}")
     public R<Void> updateMemory(@RequestAttribute("currentUserId") Long userId,

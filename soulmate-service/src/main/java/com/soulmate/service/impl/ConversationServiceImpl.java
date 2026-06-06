@@ -10,6 +10,7 @@ import com.soulmate.mapper.*;
 import com.soulmate.service.ConversationService;
 import com.soulmate.service.SubscriptionService;
 import com.soulmate.service.ChatService;
+import com.soulmate.service.MemoryService;
 import com.soulmate.domain.dto.ChatRequest;
 import com.soulmate.domain.dto.ChatResponse;
 import lombok.RequiredArgsConstructor;
@@ -35,6 +36,7 @@ public class ConversationServiceImpl implements ConversationService {
     private final StringRedisTemplate redisTemplate;
     private final ChatService chatService;
     private final SubscriptionService subscriptionService;
+    private final MemoryService memoryService;
 
     @Override
     @Transactional
@@ -125,9 +127,39 @@ public class ConversationServiceImpl implements ConversationService {
         // 获取伴侣信息
         Companion companion = companionMapper.selectById(request.getCompanionId());
 
+        StringBuilder fullContent = new StringBuilder();
+
         // 调用 AI 服务流式生成回复
         return chatService.streamChat(userId, conversation, companion, request.getContent())
-                .doOnComplete(() -> log.info("AI回复完成: conversationId={}", conversation.getId()));
+                .doOnNext(res -> {
+                    if (res.getContent() != null) {
+                        fullContent.append(res.getContent());
+                    }
+                })
+                .doOnComplete(() -> {
+                    String aiReply = fullContent.toString();
+                    if (!aiReply.isBlank()) {
+                        // 保存AI回复消息
+                        Message aiMessage = new Message();
+                        aiMessage.setConversationId(conversation.getId());
+                        aiMessage.setSenderType(SenderType.COMPANION);
+                        aiMessage.setContent(aiReply);
+                        aiMessage.setContentType(ContentType.TEXT);
+                        aiMessage.setReadStatus(0);
+                        aiMessage.setCreateTime(LocalDateTime.now());
+                        messageMapper.insert(aiMessage);
+
+                        // 更新会话最后消息
+                        conversation.setLastMessagePreview(
+                                aiReply.length() > 100 ? aiReply.substring(0, 100) + "..." : aiReply);
+                        conversation.setLastMessageTime(LocalDateTime.now());
+                        conversationMapper.updateById(conversation);
+
+                        // 异步提取记忆
+                        memoryService.extractMemories(userId, companion.getId(), conversation.getId());
+                        log.info("AI回复并保存成功: conversationId={}", conversation.getId());
+                    }
+                });
     }
 
     @Override
@@ -167,6 +199,9 @@ public class ConversationServiceImpl implements ConversationService {
                 aiReply.length() > 100 ? aiReply.substring(0, 100) + "..." : aiReply);
         conversation.setLastMessageTime(LocalDateTime.now());
         conversationMapper.updateById(conversation);
+
+        // 异步提取记忆
+        memoryService.extractMemories(userId, companion.getId(), conversation.getId());
 
         return aiMessage;
     }

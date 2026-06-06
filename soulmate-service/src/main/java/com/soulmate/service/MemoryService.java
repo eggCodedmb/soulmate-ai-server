@@ -1,5 +1,6 @@
 package com.soulmate.service;
 
+import com.soulmate.domain.dto.MemoryDTO;
 import com.soulmate.domain.entity.Memory;
 import com.soulmate.domain.enums.MemoryCategory;
 
@@ -11,9 +12,14 @@ import java.util.List;
 public interface MemoryService {
 
     /**
-     * 获取用户的记忆列表
+     * 获取用户的记忆列表 (DTO)
      */
-    List<Memory> getUserMemories(Long userId, Long companionId, MemoryCategory category);
+    List<MemoryDTO> listMemories(Long userId, Long companionId, MemoryCategory category);
+
+    /**
+     * 手动保存记忆
+     */
+    void saveMemory(Long userId, Memory memory);
 
     /**
      * 编辑记忆

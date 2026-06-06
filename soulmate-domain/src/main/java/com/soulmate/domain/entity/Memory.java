@@ -34,6 +34,12 @@ public class Memory {
     /** 记忆内容 */
     private String content;
 
+    /** AI的内心独白/感悟 */
+    private String thought;
+
+    /** 情绪标签 (用于显示图标) */
+    private String emotion;
+
     /** 来源消息ID */
     private Long sourceMessageId;
 

@@ -7,6 +7,7 @@ import com.soulmate.domain.enums.RelationshipType;
 import com.soulmate.domain.enums.SceneMode;
 import com.soulmate.domain.enums.SpeakingStyle;
 import com.soulmate.service.CompanionService;
+import com.soulmate.service.MemoryService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.messages.Message;
@@ -32,6 +33,7 @@ import static com.soulmate.common.constant.RedisConstants.COMPANION_CONTEXT;
 public class PromptBuilder {
 
     private final CompanionService companionService;
+    private final MemoryService memoryService;
     private final StringRedisTemplate redisTemplate;
 
     /**
@@ -41,8 +43,11 @@ public class PromptBuilder {
                                         Companion companion, String userMessage) {
         List<Message> messages = new ArrayList<>();
 
-        // 1. 系统提示词（伴侣人格设定）
-        messages.add(new SystemMessage(buildSystemPrompt(companion)));
+        // 1. 系统提示词（伴侣人格设定 + 长期记忆）
+        List<com.soulmate.domain.entity.Memory> relevantMemories = 
+                memoryService.retrieveRelevantMemories(userId, companion.getId(), userMessage);
+        
+        messages.add(new SystemMessage(buildSystemPrompt(companion, relevantMemories)));
 
         // 2. 从 Redis 加载历史上下文
         List<Message> history = loadContext(conversation.getId());
@@ -58,14 +63,23 @@ public class PromptBuilder {
     }
 
     /**
-     * 构建系统提示词 — 伴侣人格 + 关系设定 + 场景模式
+     * 构建系统提示词 — 伴侣人格 + 关系设定 + 场景模式 + 长期记忆
      */
-    private String buildSystemPrompt(Companion companion) {
+    private String buildSystemPrompt(Companion companion, List<com.soulmate.domain.entity.Memory> memories) {
         List<CompanionPersonality> personalities = companionService.getCompanionPersonalities(companion.getId());
 
         StringBuilder prompt = new StringBuilder();
         prompt.append("你是「").append(companion.getName()).append("」，");
         prompt.append("一个").append(companion.getGender() == 2 ? "女性" : companion.getGender() == 1 ? "男性" : "非二元性别").append("AI伴侣。\n\n");
+
+        // 长期记忆 (RAG)
+        if (memories != null && !memories.isEmpty()) {
+            prompt.append("## 长期记忆 (关于用户和你之前的互动)\n");
+            for (com.soulmate.domain.entity.Memory m : memories) {
+                prompt.append("- ").append(m.getContent()).append("\n");
+            }
+            prompt.append("请在回复时参考以上信息，让对话更有连续性。\n\n");
+        }
 
         // 关系设定
         prompt.append("## 关系设定\n");
