@@ -182,6 +182,10 @@ public class PromptBuilder {
         return switch (style) {
             case FORMAL -> "正式得体，用词讲究，但不失温度";
             case CASUAL -> "轻松随意，口语化，像朋友聊天一样自然";
+            case CUTE -> "软萌可爱，喜欢用语气词和颜文字，说话甜甜的";
+            case COOL -> "简洁冷酷，言简意赅，偶尔高冷但关键时刻很暖";
+            case HUMOROUS -> "幽默风趣，擅长讲笑话和吐槽，对话充满乐趣";
+            case POETIC -> "文艺诗意，善于用优美的语言表达，偶尔引用诗句";
             case LITERARY -> "文艺诗意，善于用优美的语言表达，偶尔引用诗句";
             case FUNNY -> "搞笑逗趣，喜欢用网络流行语和表情包，对话轻松愉快";
         };

@@ -64,11 +64,13 @@ public class CompanionServiceImpl extends ServiceImpl<CompanionMapper, Companion
 
     @Override
     public List<Companion> getUserCompanions(Long userId) {
-        return list(new LambdaQueryWrapper<Companion>()
+        List<Companion> companions = list(new LambdaQueryWrapper<Companion>()
                 .eq(Companion::getUserId, userId)
                 .eq(Companion::getStatus, 1)
                 .orderByDesc(Companion::getCompanionOrder)
                 .orderByDesc(Companion::getCreateTime));
+        companions.forEach(this::fillPersonalityKeys);
+        return companions;
     }
 
     @Override
@@ -77,6 +79,7 @@ public class CompanionServiceImpl extends ServiceImpl<CompanionMapper, Companion
         if (companion == null || !companion.getUserId().equals(userId)) {
             throw new BizException(ResultCode.COMPANION_NOT_FOUND);
         }
+        fillPersonalityKeys(companion);
         return companion;
     }
 
@@ -110,6 +113,25 @@ public class CompanionServiceImpl extends ServiceImpl<CompanionMapper, Companion
         return voiceMapper.selectOne(
                 new LambdaQueryWrapper<CompanionVoice>()
                         .eq(CompanionVoice::getCompanionId, companionId));
+    }
+
+    @Override
+    public void updateAvatar(Long userId, Long companionId, String avatarUrl) {
+        Companion companion = getCompanionDetail(userId, companionId);
+        companion.setAvatarUrl(avatarUrl);
+        companion.setUpdateTime(LocalDateTime.now());
+        updateById(companion);
+    }
+
+    /**
+     * 填充伴侣的性格标签
+     */
+    private void fillPersonalityKeys(Companion companion) {
+        List<CompanionPersonality> personalities = getCompanionPersonalities(companion.getId());
+        companion.setPersonalityKeys(
+                personalities.stream()
+                        .map(p -> p.getPersonalityKey().getCode())
+                        .toList());
     }
 
     /**

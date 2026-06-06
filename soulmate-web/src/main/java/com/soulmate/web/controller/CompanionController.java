@@ -90,4 +90,15 @@ public class CompanionController {
         companionService.deleteCompanion(userId, id);
         return R.ok();
     }
+
+    /**
+     * 更新伴侣头像
+     */
+    @PutMapping("/{id}/avatar")
+    public R<Void> updateAvatar(@RequestAttribute("currentUserId") Long userId,
+                                 @PathVariable Long id,
+                                 @RequestBody java.util.Map<String, String> body) {
+        companionService.updateAvatar(userId, id, body.get("avatarUrl"));
+        return R.ok();
+    }
 }

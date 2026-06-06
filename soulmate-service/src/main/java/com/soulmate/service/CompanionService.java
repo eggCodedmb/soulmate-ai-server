@@ -46,4 +46,9 @@ public interface CompanionService extends IService<Companion> {
      * 获取伴侣的声音配置
      */
     CompanionVoice getCompanionVoice(Long companionId);
+
+    /**
+     * 更新伴侣头像
+     */
+    void updateAvatar(Long userId, Long companionId, String avatarUrl);
 }

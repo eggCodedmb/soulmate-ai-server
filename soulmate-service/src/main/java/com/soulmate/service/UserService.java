@@ -25,6 +25,16 @@ public interface UserService {
     User getUserById(Long userId);
 
     /**
+     * 更新用户基本信息
+     */
+    void updateUserInfo(Long userId, User user);
+
+    /**
+     * 更新用户头像
+     */
+    void updateAvatar(Long userId, String avatarUrl);
+
+    /**
      * 获取用户资料
      */
     UserProfile getUserProfile(Long userId);

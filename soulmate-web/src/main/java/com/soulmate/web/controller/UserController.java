@@ -27,6 +27,26 @@ public class UserController {
     }
 
     /**
+     * 更新用户基本信息
+     */
+    @PutMapping("/info")
+    public R<Void> updateUserInfo(@RequestAttribute("currentUserId") Long userId,
+                                   @RequestBody User user) {
+        userService.updateUserInfo(userId, user);
+        return R.ok();
+    }
+
+    /**
+     * 更新用户头像
+     */
+    @PutMapping("/avatar")
+    public R<Void> updateAvatar(@RequestAttribute("currentUserId") Long userId,
+                                 @RequestBody java.util.Map<String, String> body) {
+        userService.updateAvatar(userId, body.get("avatarUrl"));
+        return R.ok();
+    }
+
+    /**
      * 获取用户资料
      */
     @GetMapping("/profile")

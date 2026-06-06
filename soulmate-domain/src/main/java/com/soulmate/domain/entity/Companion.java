@@ -1,14 +1,17 @@
 package com.soulmate.domain.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.soulmate.domain.enums.RelationshipType;
 import com.soulmate.domain.enums.SpeakingStyle;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * AI伴侣表
@@ -55,4 +58,9 @@ public class Companion {
 
     @TableLogic
     private Integer deleted;
+
+    /** 性格标签（非数据库字段，由 service 层填充） */
+    @TableField(exist = false)
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private List<String> personalityKeys;
 }
