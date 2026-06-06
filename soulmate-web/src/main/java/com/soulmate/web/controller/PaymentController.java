@@ -19,7 +19,7 @@ import java.util.Map;
  */
 @Slf4j
 @RestController
-@RequestMapping("/api/payment")
+@RequestMapping("/api/alipay")
 @RequiredArgsConstructor
 public class PaymentController {
 
