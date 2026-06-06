@@ -172,6 +172,8 @@ CREATE TABLE IF NOT EXISTS t_memory (
     category          VARCHAR(32)  NOT NULL,
     title             VARCHAR(128) NOT NULL,
     content           TEXT         NOT NULL,
+    thought           TEXT,
+    emotion           VARCHAR(32),
     source_message_id BIGINT,
     importance        SMALLINT     DEFAULT 5,
     vector_id         VARCHAR(64),
