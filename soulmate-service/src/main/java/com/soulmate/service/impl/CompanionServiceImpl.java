@@ -85,11 +85,27 @@ public class CompanionServiceImpl extends ServiceImpl<CompanionMapper, Companion
 
     @Override
     @Transactional
-    public void updateCompanion(Long userId, Long companionId, Companion companion) {
+    public void updateCompanion(Long userId, Long companionId, Companion companion, List<CompanionPersonality> personalities) {
         Companion existing = getCompanionDetail(userId, companionId);
         companion.setId(companionId);
         companion.setUserId(userId);
         companion.setUpdateTime(LocalDateTime.now());
+
+        // 更新个性标签（仅当传入时不为null才更新）
+        if (personalities != null) {
+            // 逻辑删除旧标签
+            personalityMapper.delete(new LambdaQueryWrapper<CompanionPersonality>()
+                    .eq(CompanionPersonality::getCompanionId, companionId));
+            // 插入新标签
+            for (CompanionPersonality personality : personalities) {
+                personality.setCompanionId(companionId);
+                personality.setCreateTime(LocalDateTime.now());
+                personalityMapper.insert(personality);
+            }
+            // 重新计算主题色
+            companion.setThemeColor(resolveThemeColor(personalities));
+        }
+
         updateById(companion);
     }
 

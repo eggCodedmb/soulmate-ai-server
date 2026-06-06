@@ -6,6 +6,7 @@ import com.soulmate.domain.entity.CompanionPersonality;
 import com.soulmate.domain.enums.PersonalityKey;
 import com.soulmate.service.CompanionService;
 import com.soulmate.web.dto.CreateCompanionRequest;
+import com.soulmate.web.dto.UpdateCompanionRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -71,13 +72,38 @@ public class CompanionController {
     }
 
     /**
-     * 编辑伴侣
+     * 编辑伴侣（支持个性标签更新）
      */
     @PutMapping("/{id}")
     public R<Void> updateCompanion(@RequestAttribute("currentUserId") Long userId,
                                     @PathVariable Long id,
-                                    @RequestBody Companion companion) {
-        companionService.updateCompanion(userId, id, companion);
+                                    @Valid @RequestBody UpdateCompanionRequest request) {
+        Companion companion = new Companion();
+        companion.setName(request.getName());
+        companion.setGender(request.getGender());
+        if (request.getRelationshipType() != null) {
+            companion.setRelationshipType(
+                    com.soulmate.domain.enums.RelationshipType.valueOf(request.getRelationshipType().toUpperCase()));
+        }
+        if (request.getSpeakingStyle() != null) {
+            companion.setSpeakingStyle(
+                    com.soulmate.domain.enums.SpeakingStyle.valueOf(request.getSpeakingStyle().toUpperCase()));
+        }
+        companion.setDescription(request.getDescription());
+
+        // 解析个性标签（null表示不更新，空列表表示清空标签）
+        List<CompanionPersonality> personalities = null;
+        if (request.getPersonalityKeys() != null) {
+            personalities = request.getPersonalityKeys().stream()
+                    .map(key -> {
+                        CompanionPersonality p = new CompanionPersonality();
+                        p.setPersonalityKey(PersonalityKey.valueOf(key.toUpperCase()));
+                        return p;
+                    })
+                    .toList();
+        }
+
+        companionService.updateCompanion(userId, id, companion, personalities);
         return R.ok();
     }
 

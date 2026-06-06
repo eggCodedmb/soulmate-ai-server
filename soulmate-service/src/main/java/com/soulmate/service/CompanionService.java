@@ -28,9 +28,11 @@ public interface CompanionService extends IService<Companion> {
     Companion getCompanionDetail(Long userId, Long companionId);
 
     /**
-     * 编辑伴侣
+     * 编辑伴侣（支持个性标签更新）
+     *
+     * @param personalities 个性标签列表，null表示不更新标签
      */
-    void updateCompanion(Long userId, Long companionId, Companion companion);
+    void updateCompanion(Long userId, Long companionId, Companion companion, List<CompanionPersonality> personalities);
 
     /**
      * 删除伴侣
