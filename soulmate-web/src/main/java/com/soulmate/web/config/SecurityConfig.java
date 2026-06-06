@@ -44,7 +44,8 @@ public class SecurityConfig {
     private static final List<String> WHITE_LIST = List.of(
             "/api/auth/**",
             "/actuator/**",
-            "/ws/**"
+            "/ws/**",
+            "/api/payment/notify"
     );
 
     @Bean

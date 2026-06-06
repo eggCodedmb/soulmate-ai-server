@@ -45,8 +45,8 @@ spring:
   mail:
     host: smtp.qq.com
     port: 587
-    username: 1542608903@qq.com
-    password: yhmfoqepklkhgdac
+    username: ${MAIL_USERNAME:1542608903@qq.com}
+    password: ${MAIL_PASSWORD:yhmfoqepklkhgdac}
     properties:
       mail:
         smtp:
@@ -94,6 +94,15 @@ soulmate:
     base-url: https://token-plan-sgp.xiaomimimo.com/v1
     temperature: 0.7
     max-tokens: 2048
+
+  # 支付宝沙箱配置
+  alipay:
+    app-id: ${ALIPAY_APP_ID:2021006159693480}
+    private-key: ${ALIPAY_PRIVATE_KEY:MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAnVz3dJtoiOb+PvhPpeAZW2WhnY/Iob3IlWxOr03U7hLJNSzkPr14eBCXulyhlQBngjuJC/fAxHSnrZ0Db1yr8ODhEi7iyVowZWv8uM2lfCxFwIGRwXQSHjDDjErQhOUX1X7x8D/fOkd5J4VMNF4yQFs2GBtMiRrSv+BtdG4qtWGJOuKqioKW5h9hOyIJQVA+JL5xzjiW7tMrv5pZ3tU03h769vvWFhr1P8+GeiJHrDTbOIRE2SpWXj7eQKilqqrsqvgxBRN1S+kelzpadqFoITfroTk1mV/oLH9uowMRmWXLEgt9bagXJozVevShxf/GHXyI5MPUk73Tk3xVoFKrJQIDAQAB}
+    alipay-public-key: ${ALIPAY_PUBLIC_KEY:MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAsQ1sm8onSD9dx7Qkv2oMVQ0VaVi7O+aJtR4EtY6rxioMOjsPcVsNsIAn2OgdeA1b/ONaX0A27+AMF+4FjsLzfx8xzRFTYQ7AfvyHKowMxYJIy4YWEQ1O3iml9cBk1QpOP36pbzA+OWRarm4Ti4pqKbO3wTLtCBX9X0fPtXFfTSk911O9rqC86XXI2+EPVhqJkvlb4j4PqQB7JvgVzlRGIoAJj2zjm2a2LQ7cOLrHc4GePo1lyixFldsQsIAcLMe+LPvUEioGd3qCTuxo/W5+U03QVK+T2y9HausnkrAzylMiomhvzRfpyQrYadcU0mck6z+NEfHfPH4skhJf4wCn7wIDAQAB}
+    gateway: https://openapi-sandbox.dl.alipaydev.com/gateway.do
+    notify-url: ${ALIPAY_NOTIFY_URL:http://localhost:8080/api/payment/notify}
+    return-url: ${ALIPAY_RETURN_URL:http://localhost:8080/api/payment/return}
 
 # Actuator
 management:

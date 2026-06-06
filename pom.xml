@@ -48,6 +48,7 @@
 
         <!-- Alibaba -->
         <fastjson2.version>2.0.53</fastjson2.version>
+        <alipay-sdk.version>4.39.79.ALL</alipay-sdk.version>
     </properties>
 
     <dependencyManagement>
@@ -113,6 +114,13 @@
                 <groupId>com.alibaba.fastjson2</groupId>
                 <artifactId>fastjson2</artifactId>
                 <version>${fastjson2.version}</version>
+            </dependency>
+
+            <!-- 支付宝 SDK -->
+            <dependency>
+                <groupId>com.alipay.sdk</groupId>
+                <artifactId>alipay-sdk-java</artifactId>
+                <version>${alipay-sdk.version}</version>
             </dependency>
 
             <!-- 内部模块 -->
