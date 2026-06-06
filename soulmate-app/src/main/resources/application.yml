@@ -41,6 +41,13 @@ spring:
     time-zone: Asia/Shanghai
     default-property-inclusion: non_null
 
+  # 文件上传
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 10MB
+      max-request-size: 50MB
+
   # 邮件服务
   mail:
     host: smtp.qq.com
@@ -67,6 +74,7 @@ spring:
 
 # MyBatis-Plus
 mybatis-plus:
+  type-enums-package: com.soulmate.domain.enums
   configuration:
     map-underscore-to-camel-case: true
     log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
@@ -94,6 +102,13 @@ soulmate:
     base-url: https://token-plan-sgp.xiaomimimo.com/v1
     temperature: 0.7
     max-tokens: 2048
+
+  # 文件上传配置
+  file:
+    base-dir: D:/Code/soulmate-ai-server/online
+    allowed-types: jpg,jpeg,png,gif,webp,bmp,pdf,doc,docx,xls,xlsx,ppt,pptx,txt,mp3,mp4,wav
+    max-size-mb: 10
+    url-prefix: /files
 
   # 支付宝沙箱配置
   alipay:

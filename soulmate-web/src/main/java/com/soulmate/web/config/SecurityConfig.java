@@ -45,7 +45,8 @@ public class SecurityConfig {
             "/api/auth/**",
             "/actuator/**",
             "/ws/**",
-            "/api/payment/notify"
+            "/api/payment/notify",
+            "/files/**"
     );
 
     @Bean

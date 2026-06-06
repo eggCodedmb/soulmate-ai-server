@@ -48,7 +48,14 @@ public enum ResultCode {
 
     // AI 相关 7xxx
     AI_SERVICE_ERROR(7001, "AI服务暂时不可用，请稍后再试"),
-    AI_RESPONSE_TIMEOUT(7002, "AI响应超时");
+    AI_RESPONSE_TIMEOUT(7002, "AI响应超时"),
+
+    // 文件相关 8xxx
+    FILE_TYPE_NOT_ALLOWED(8001, "不支持的文件类型"),
+    FILE_SIZE_EXCEEDED(8002, "文件大小超出限制"),
+    FILE_UPLOAD_FAILED(8003, "文件上传失败"),
+    FILE_NOT_FOUND(8004, "文件不存在"),
+    FILE_DELETE_FAILED(8005, "文件删除失败");
 
     private final int code;
     private final String message;
