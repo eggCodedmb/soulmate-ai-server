@@ -106,6 +106,25 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    public void updateUserInfo(Long userId, User user) {
+        User existing = getUserById(userId);
+        existing.setNickname(user.getNickname());
+        existing.setAvatarUrl(user.getAvatarUrl());
+        existing.setGender(user.getGender());
+        existing.setBirthday(user.getBirthday());
+        existing.setUpdateTime(LocalDateTime.now());
+        userMapper.updateById(existing);
+    }
+
+    @Override
+    public void updateAvatar(Long userId, String avatarUrl) {
+        User existing = getUserById(userId);
+        existing.setAvatarUrl(avatarUrl);
+        existing.setUpdateTime(LocalDateTime.now());
+        userMapper.updateById(existing);
+    }
+
+    @Override
     public UserProfile getUserProfile(Long userId) {
         return userProfileMapper.selectOne(
                 new LambdaQueryWrapper<UserProfile>().eq(UserProfile::getUserId, userId));
