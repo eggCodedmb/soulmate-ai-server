@@ -1,5 +1,6 @@
 package com.soulmate.service;
 
+import com.soulmate.common.response.PageResult;
 import com.soulmate.domain.entity.Conversation;
 import com.soulmate.domain.entity.Message;
 import com.soulmate.domain.dto.ChatRequest;
@@ -26,7 +27,7 @@ public interface ConversationService {
     /**
      * 获取历史消息（分页）
      */
-    List<Message> getHistoryMessages(Long conversationId, int page, int size);
+    PageResult<Message> getHistoryMessages(Long conversationId, int page, int size);
 
     /**
      * 发送消息并获取AI回复（SSE流式）

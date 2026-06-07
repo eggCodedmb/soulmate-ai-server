@@ -3,6 +3,7 @@ package com.soulmate.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.soulmate.common.exception.BizException;
+import com.soulmate.common.response.PageResult;
 import com.soulmate.common.response.ResultCode;
 import com.soulmate.domain.entity.*;
 import com.soulmate.domain.enums.*;
@@ -74,14 +75,14 @@ public class ConversationServiceImpl implements ConversationService {
     }
 
     @Override
-    public List<Message> getHistoryMessages(Long conversationId, int page, int size) {
-        return messageMapper.selectPage(
+    public PageResult<Message> getHistoryMessages(Long conversationId, int page, int size) {
+        Page<Message> pageResult = messageMapper.selectPage(
                 new Page<>(page, size),
                 new LambdaQueryWrapper<Message>()
                         .eq(Message::getConversationId, conversationId)
                         .eq(Message::getDeleted, 0)
-                        .orderByDesc(Message::getCreateTime))
-                .getRecords();
+                        .orderByDesc(Message::getCreateTime));
+        return new PageResult<>(pageResult.getRecords(), pageResult.getTotal(), page, size);
     }
 
     @Override

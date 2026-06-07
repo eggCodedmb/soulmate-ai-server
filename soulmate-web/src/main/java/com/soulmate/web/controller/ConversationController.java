@@ -1,5 +1,6 @@
 package com.soulmate.web.controller;
 
+import com.soulmate.common.response.PageResult;
 import com.soulmate.common.response.R;
 import com.soulmate.domain.entity.Conversation;
 import com.soulmate.domain.entity.Message;
@@ -42,12 +43,12 @@ public class ConversationController {
     }
 
     /**
-     * 获取历史消息
+     * 获取历史消息（分页）
      */
     @GetMapping("/conversation/{id}/messages")
-    public R<List<Message>> getHistoryMessages(@PathVariable Long id,
-                                                @RequestParam(defaultValue = "1") int page,
-                                                @RequestParam(defaultValue = "20") int size) {
+    public R<PageResult<Message>> getHistoryMessages(@PathVariable Long id,
+                                                      @RequestParam(defaultValue = "1") int page,
+                                                      @RequestParam(defaultValue = "20") int size) {
         return R.ok(conversationService.getHistoryMessages(id, page, size));
     }
 
