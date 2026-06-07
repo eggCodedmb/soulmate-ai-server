@@ -45,6 +45,7 @@ public enum ResultCode {
     PLAN_NOT_FOUND(6001, "套餐不存在"),
     SUBSCRIPTION_EXPIRED(6002, "订阅已过期"),
     PAYMENT_FAILED(6003, "支付失败"),
+    SUBSCRIPTION_DOWNGRADE_NOT_ALLOWED(6004, "不支持降级订阅，请在当前订阅到期后再操作"),
 
     // AI 相关 7xxx
     AI_SERVICE_ERROR(7001, "AI服务暂时不可用，请稍后再试"),

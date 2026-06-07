@@ -70,6 +70,12 @@ public class PaymentServiceImpl implements PaymentService {
             throw new BizException("免费套餐无需支付");
         }
 
+        // 校验是否降级：目标套餐级别不能低于当前套餐
+        SubscriptionPlan currentPlan = subscriptionService.getUserPlan(userId);
+        if (currentPlan != null && plan.getDisplayOrder() <= currentPlan.getDisplayOrder()) {
+            throw new BizException(ResultCode.SUBSCRIPTION_DOWNGRADE_NOT_ALLOWED);
+        }
+
         // 创建支付订单
         PaymentOrder order = new PaymentOrder();
         order.setOrderNo(generateOrderNo());

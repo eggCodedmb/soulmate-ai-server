@@ -45,7 +45,7 @@ public class SecurityConfig {
             "/api/auth/**",
             "/actuator/**",
             "/ws/**",
-            "/api/payment/notify",
+            "/api/alipay/notify",
             "/files/**"
     );
 

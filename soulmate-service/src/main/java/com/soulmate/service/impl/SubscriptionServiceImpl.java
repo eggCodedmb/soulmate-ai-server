@@ -3,6 +3,8 @@ package com.soulmate.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.soulmate.common.config.LimitProperties;
 import com.soulmate.common.constant.RedisConstants;
+import com.soulmate.common.exception.BizException;
+import com.soulmate.common.response.ResultCode;
 import com.soulmate.domain.entity.Companion;
 import com.soulmate.domain.entity.SubscriptionPlan;
 import com.soulmate.domain.entity.UserSubscription;
@@ -105,15 +107,38 @@ public class SubscriptionServiceImpl implements SubscriptionService {
 
     @Override
     public void activateSubscription(Long userId, Long planId) {
-        UserSubscription newSub = new UserSubscription();
-        newSub.setUserId(userId);
-        newSub.setPlanId(planId);
-        newSub.setStartTime(LocalDateTime.now());
-        newSub.setEndTime(LocalDateTime.now().plusMonths(1));
-        newSub.setAutoRenew(1);
-        newSub.setStatus(SubscriptionStatus.ACTIVE);
-        newSub.setCreateTime(LocalDateTime.now());
-        newSub.setUpdateTime(LocalDateTime.now());
-        subscriptionMapper.insert(newSub);
+        // 检查是否已有活跃订阅，防止重复激活
+        UserSubscription existing = getCurrentSubscription(userId);
+        if (existing != null) {
+            // 校验是否降级：目标套餐级别不能低于当前套餐
+            SubscriptionPlan currentPlan = planMapper.selectById(existing.getPlanId());
+            SubscriptionPlan targetPlan = planMapper.selectById(planId);
+            if (currentPlan != null && targetPlan != null
+                    && targetPlan.getDisplayOrder() <= currentPlan.getDisplayOrder()) {
+                log.warn("尝试降级订阅被拒绝: userId={}, 当前套餐={}, 目标套餐={}",
+                        userId, currentPlan.getPlanCode(), targetPlan.getPlanCode());
+                throw new BizException(ResultCode.SUBSCRIPTION_DOWNGRADE_NOT_ALLOWED);
+            }
+
+            // 已有活跃订阅，在原到期时间基础上延期1个月
+            existing.setEndTime(existing.getEndTime().plusMonths(1));
+            existing.setPlanId(planId);
+            existing.setUpdateTime(LocalDateTime.now());
+            subscriptionMapper.updateById(existing);
+            log.info("订阅延期成功: userId={}, planId={}, 新到期时间={}", userId, planId, existing.getEndTime());
+        } else {
+            // 无活跃订阅，创建新订阅
+            UserSubscription newSub = new UserSubscription();
+            newSub.setUserId(userId);
+            newSub.setPlanId(planId);
+            newSub.setStartTime(LocalDateTime.now());
+            newSub.setEndTime(LocalDateTime.now().plusMonths(1));
+            newSub.setAutoRenew(1);
+            newSub.setStatus(SubscriptionStatus.ACTIVE);
+            newSub.setCreateTime(LocalDateTime.now());
+            newSub.setUpdateTime(LocalDateTime.now());
+            subscriptionMapper.insert(newSub);
+            log.info("新订阅激活成功: userId={}, planId={}", userId, planId);
+        }
     }
 }
