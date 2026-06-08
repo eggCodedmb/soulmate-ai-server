@@ -50,7 +50,7 @@ public class Conversation {
     @TableLogic
     private Integer deleted;
 
-    /** 伴侣回复消息数 (非持久化字段，用于首页展示统计) */
+    /** 对话总消息数 (非持久化字段，用于首页展示统计) */
     @TableField(exist = false)
-    private Integer companionReplyCount;
+    private Integer messageCount;
 }
