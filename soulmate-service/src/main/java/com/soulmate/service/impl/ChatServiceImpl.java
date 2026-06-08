@@ -43,7 +43,7 @@ public class ChatServiceImpl implements ChatService {
                     .map(response -> {
                         String content = "";
                         if (response.getResult() != null && response.getResult().getOutput() != null) {
-                            content = response.getResult().getOutput().getContent();
+                            content = response.getResult().getOutput().getText();
                         }
                         return ChatResponse.builder()
                                 .conversationId(conversation.getId())
@@ -81,7 +81,7 @@ public class ChatServiceImpl implements ChatService {
                     .chatResponse();
 
             if (response.getResult() != null && response.getResult().getOutput() != null) {
-                return response.getResult().getOutput().getContent();
+                return response.getResult().getOutput().getText();
             }
             return "抱歉，我暂时无法回复。";
 

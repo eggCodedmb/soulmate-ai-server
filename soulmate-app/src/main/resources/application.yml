@@ -74,6 +74,16 @@ spring:
       embedding:
         options:
           model: mimo-embedding-v1
+    vectorstore:
+      milvus:
+        client:
+          host: 192.168.2.114
+          port: 19530
+        collection-name: memory_vectors
+        embedding-dimension: 1536
+        index-type: IVF_FLAT
+        metric-type: COSINE
+        initialize-schema: true
 
 # MyBatis-Plus
 mybatis-plus:

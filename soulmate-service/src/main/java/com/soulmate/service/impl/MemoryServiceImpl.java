@@ -31,12 +31,10 @@ import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.ai.vectorstore.filter.Filter;
 import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.io.File;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Collections;
@@ -63,9 +61,6 @@ public class MemoryServiceImpl implements MemoryService {
     private final VectorStore vectorStore;
 
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy年MM月dd日");
-
-    @Value("${soulmate.file.base-dir}")
-    private String baseDir;
 
     @Override
     public List<MemoryDTO> listMemories(Long userId, Long companionId, MemoryCategory category) {
@@ -125,7 +120,6 @@ public class MemoryServiceImpl implements MemoryService {
                     "category", memory.getCategory().getCode()
             ));
             vectorStore.add(List.of(doc));
-            saveVectorStore();
         } catch (Exception e) {
             log.warn("手动保存记忆同步向量库失败: {}", memory.getTitle(), e);
         }
@@ -174,7 +168,6 @@ public class MemoryServiceImpl implements MemoryService {
                     "category", existing.getCategory().getCode()
             ));
             vectorStore.add(List.of(doc));
-            saveVectorStore();
         } catch (Exception e) {
             log.warn("同步更新向量库失败: memoryId={}", memoryId, e);
         }
@@ -192,7 +185,6 @@ public class MemoryServiceImpl implements MemoryService {
         // 同步从向量库删除
         try {
             vectorStore.delete(List.of(memoryId.toString()));
-            saveVectorStore();
         } catch (Exception e) {
             log.warn("从向量库删除记忆失败: memoryId={}", memoryId, e);
         }
@@ -314,7 +306,6 @@ public class MemoryServiceImpl implements MemoryService {
                                     "category", category.getCode()
                             ));
                             vectorStore.add(List.of(doc));
-                            saveVectorStore();
                             log.info("提取新记忆并同步向量库成功: title={}", memory.getTitle());
                         } catch (Exception ve) {
                             log.warn("记忆同步向量库失败: title={}", memory.getTitle(), ve);
@@ -342,10 +333,12 @@ public class MemoryServiceImpl implements MemoryService {
                     b.eq("companionId", companionId)
             ).build();
 
-            SearchRequest searchRequest = SearchRequest.query(query)
-                    .withTopK(5)
-                    .withSimilarityThreshold(0.6) // SimpleVectorStore 相似度阈值建议稍微放宽
-                    .withFilterExpression(filterExpression);
+            SearchRequest searchRequest = SearchRequest.builder()
+                    .query(query)
+                    .topK(5)
+                    .similarityThreshold(0.6)
+                    .filterExpression(filterExpression)
+                    .build();
 
             List<Document> results = vectorStore.similaritySearch(searchRequest);
             memoryIdsFromVector = results.stream()
@@ -389,20 +382,6 @@ public class MemoryServiceImpl implements MemoryService {
         }
         
         return memories;
-    }
-
-    /**
-     * 持久化向量库到本地文件
-     */
-    private void saveVectorStore() {
-        if (vectorStore instanceof org.springframework.ai.vectorstore.SimpleVectorStore simpleStore) {
-            try {
-                String vectorDbPath = baseDir + File.separator + "vector_store.json";
-                simpleStore.save(new File(vectorDbPath));
-            } catch (Exception e) {
-                log.warn("持久化向量库失败: {}", e.getMessage());
-            }
-        }
     }
 
     private String truncate(String text, int maxLength) {
