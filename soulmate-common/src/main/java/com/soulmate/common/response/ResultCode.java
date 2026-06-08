@@ -56,7 +56,10 @@ public enum ResultCode {
     FILE_SIZE_EXCEEDED(8002, "文件大小超出限制"),
     FILE_UPLOAD_FAILED(8003, "文件上传失败"),
     FILE_NOT_FOUND(8004, "文件不存在"),
-    FILE_DELETE_FAILED(8005, "文件删除失败");
+    FILE_DELETE_FAILED(8005, "文件删除失败"),
+
+    // 定时提醒相关 9xxx
+    REMINDER_NOT_FOUND(9001, "定时提醒不存在");
 
     private final int code;
     private final String message;

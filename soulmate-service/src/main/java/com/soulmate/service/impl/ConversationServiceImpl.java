@@ -12,6 +12,7 @@ import com.soulmate.service.ConversationService;
 import com.soulmate.service.SubscriptionService;
 import com.soulmate.service.ChatService;
 import com.soulmate.service.MemoryService;
+import com.soulmate.service.CompanionReminderService;
 import com.soulmate.domain.dto.ChatRequest;
 import com.soulmate.domain.dto.ChatResponse;
 import lombok.RequiredArgsConstructor;
@@ -38,6 +39,7 @@ public class ConversationServiceImpl implements ConversationService {
     private final ChatService chatService;
     private final SubscriptionService subscriptionService;
     private final MemoryService memoryService;
+    private final CompanionReminderService companionReminderService;
 
     @Override
     @Transactional
@@ -153,11 +155,17 @@ public class ConversationServiceImpl implements ConversationService {
                 .doOnComplete(() -> {
                     String aiReply = fullContent.toString();
                     if (!aiReply.isBlank()) {
+                        // 1. 解析并自动创建定时提醒
+                        companionReminderService.parseAndCreateReminder(userId, companion.getId(), aiReply);
+
+                        // 2. 清洗过滤控制指令标签
+                        String cleanReply = aiReply.replaceAll("<command.*?>.*?</command>", "").trim();
+
                         // 保存AI回复消息
                         Message aiMessage = new Message();
                         aiMessage.setConversationId(conversation.getId());
                         aiMessage.setSenderType(SenderType.COMPANION);
-                        aiMessage.setContent(aiReply);
+                        aiMessage.setContent(cleanReply);
                         aiMessage.setContentType(ContentType.TEXT);
                         aiMessage.setReadStatus(0);
                         aiMessage.setCreateTime(LocalDateTime.now());
@@ -165,7 +173,7 @@ public class ConversationServiceImpl implements ConversationService {
 
                         // 更新会话最后消息
                         conversation.setLastMessagePreview(
-                                aiReply.length() > 100 ? aiReply.substring(0, 100) + "..." : aiReply);
+                                cleanReply.length() > 100 ? cleanReply.substring(0, 100) + "..." : cleanReply);
                         conversation.setLastMessageTime(LocalDateTime.now());
                         conversationMapper.updateById(conversation);
 
@@ -198,11 +206,17 @@ public class ConversationServiceImpl implements ConversationService {
         Companion companion = companionMapper.selectById(request.getCompanionId());
         String aiReply = chatService.chatSync(userId, conversation, companion, request.getContent());
 
+        // 1. 解析并自动创建定时提醒
+        companionReminderService.parseAndCreateReminder(userId, companion.getId(), aiReply);
+
+        // 2. 清洗过滤控制指令标签
+        String cleanReply = aiReply.replaceAll("<command.*?>.*?</command>", "").trim();
+
         // 保存AI回复
         Message aiMessage = new Message();
         aiMessage.setConversationId(conversation.getId());
         aiMessage.setSenderType(SenderType.COMPANION);
-        aiMessage.setContent(aiReply);
+        aiMessage.setContent(cleanReply);
         aiMessage.setContentType(ContentType.TEXT);
         aiMessage.setReadStatus(0);
         aiMessage.setCreateTime(LocalDateTime.now());
@@ -210,7 +224,7 @@ public class ConversationServiceImpl implements ConversationService {
 
         // 更新会话
         conversation.setLastMessagePreview(
-                aiReply.length() > 100 ? aiReply.substring(0, 100) + "..." : aiReply);
+                cleanReply.length() > 100 ? cleanReply.substring(0, 100) + "..." : cleanReply);
         conversation.setLastMessageTime(LocalDateTime.now());
         conversationMapper.updateById(conversation);
 

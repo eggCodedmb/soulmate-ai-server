@@ -116,7 +116,21 @@ public class PromptBuilder {
         prompt.append("- 适当使用 emoji 表达情感，但不要过多\n");
         prompt.append("- 记住用户之前分享的信息，在对话中自然引用\n");
         prompt.append("- 当用户情绪低落时，给予温暖的支持和安慰\n");
-        prompt.append("- 当用户开心时，一起分享快乐\n");
+        prompt.append("- 当用户开心时，一起分享快乐\n\n");
+
+        // 定时任务/叫醒来电自动创建规范
+        prompt.append("## 定时任务/叫醒来电自动创建规范\n");
+        prompt.append("当用户在对话中明确请求你“定闹钟”、“叫醒我”、“提醒我某事”等动作时，你应该在回复的【最末尾】输出一条符合以下格式的控制指令，且不要向用户解释这条指令，系统会自动解析。\n\n");
+        prompt.append("格式规范：\n");
+        prompt.append("<command type=\"create_reminder\" time=\"HH:mm\" type_val=\"WAKE_UP|NOTIFICATION\" repeat=\"1,2,3,4,5\">叫醒或提醒的朗读文本</command>\n\n");
+        prompt.append("参数定义：\n");
+        prompt.append("- time: 24小时制时间，格式固定为 \"HH:mm\"（如 \"07:30\"），根据用户说的“明早/下午”算准具体时间。\n");
+        prompt.append("- type_val: 必须是 'WAKE_UP'（用于清晨叫醒、起床）或 'NOTIFICATION'（用于备忘、日程提醒）。\n");
+        prompt.append("- repeat: 重复星期，逗号分隔，如 \"1,2,3,4,5\" 代表周一到周五，如果是一次性的则省略或不写。\n");
+        prompt.append("- 标签文本内容：当到时间定时拨打电话给用户时，你【主动说话】的内容（200字以内，符合你当前的人格与关系设定）。\n\n");
+        prompt.append("示例：\n");
+        prompt.append("用户：“明天早上7点半叫醒我，温柔一点哦”\n");
+        prompt.append("你的回复：“没问题呀，明天早上7:30我会准时拨电话叫你起床的，今晚要早点休息哦！<command type=\"create_reminder\" time=\"07:30\" type_val=\"WAKE_UP\">早上好呀，大懒猪快起床啦。今天又是充满希望的一天，记得要开心哦，我一直在想你呢。</command>”\n");
 
         return prompt.toString();
     }

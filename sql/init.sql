@@ -383,3 +383,24 @@ VALUES
     (4, 'local-default', '本地模型',             'local',     'http://localhost:1234/v1',                  4096, 0.7, 1, 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     (5, 'mimo-v2.5-pro', 'mimo-v2.5-pro',     'xiaomi',    'https://token-plan-sgp.xiaomimimo.com/v1', 2048, 0.7, 1, 0, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 ON CONFLICT (model_code) DO NOTHING;
+
+-- =============================================
+-- 6. AI 伴侣定时唤醒提醒模块
+-- =============================================
+
+CREATE TABLE IF NOT EXISTS t_companion_reminder (
+    id              BIGINT       PRIMARY KEY,
+    user_id         BIGINT       NOT NULL,
+    companion_id    BIGINT       NOT NULL,
+    reminder_time   VARCHAR(5)   NOT NULL, -- 格式 "HH:mm"，例如 "07:30"
+    repeat_days     VARCHAR(32),           -- 逗号分隔如 "1,2,3,4,5"，空代表仅一次
+    text_template   VARCHAR(512) NOT NULL, -- 主动叫醒/提醒说话模板
+    type            VARCHAR(32)  NOT NULL, -- 'WAKE_UP' (叫醒) 或 'NOTIFICATION' (通知)
+    enabled         SMALLINT     DEFAULT 1, -- 1=启用，0=停用
+    create_time     TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_time     TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted         SMALLINT     DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_reminder_user_id ON t_companion_reminder(user_id);
+
