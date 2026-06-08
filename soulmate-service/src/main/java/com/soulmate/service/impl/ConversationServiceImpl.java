@@ -48,6 +48,11 @@ public class ConversationServiceImpl implements ConversationService {
                         .eq(Conversation::getCompanionId, companionId)
                         .eq(Conversation::getDeleted, 0));
         if (existing != null) {
+            Long count = messageMapper.selectCount(new LambdaQueryWrapper<Message>()
+                    .eq(Message::getConversationId, existing.getId())
+                    .eq(Message::getSenderType, SenderType.COMPANION)
+                    .eq(Message::getDeleted, 0));
+            existing.setCompanionReplyCount(count.intValue());
             return existing;
         }
 
@@ -61,17 +66,27 @@ public class ConversationServiceImpl implements ConversationService {
         conversation.setCreateTime(LocalDateTime.now());
         conversation.setUpdateTime(LocalDateTime.now());
         conversationMapper.insert(conversation);
+        conversation.setCompanionReplyCount(0);
         return conversation;
     }
 
     @Override
     public List<Conversation> getUserConversations(Long userId) {
-        return conversationMapper.selectList(
+        List<Conversation> list = conversationMapper.selectList(
                 new LambdaQueryWrapper<Conversation>()
                         .eq(Conversation::getUserId, userId)
                         .eq(Conversation::getDeleted, 0)
                         .orderByDesc(Conversation::getPinned)
                         .orderByDesc(Conversation::getLastMessageTime));
+
+        for (Conversation conv : list) {
+            Long count = messageMapper.selectCount(new LambdaQueryWrapper<Message>()
+                    .eq(Message::getConversationId, conv.getId())
+                    .eq(Message::getSenderType, SenderType.COMPANION)
+                    .eq(Message::getDeleted, 0));
+            conv.setCompanionReplyCount(count.intValue());
+        }
+        return list;
     }
 
     @Override

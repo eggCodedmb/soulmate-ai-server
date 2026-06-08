@@ -2,6 +2,7 @@ package com.soulmate.domain.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.soulmate.domain.enums.SceneMode;
@@ -48,4 +49,8 @@ public class Conversation {
 
     @TableLogic
     private Integer deleted;
+
+    /** 伴侣回复消息数 (非持久化字段，用于首页展示统计) */
+    @TableField(exist = false)
+    private Integer companionReplyCount;
 }
