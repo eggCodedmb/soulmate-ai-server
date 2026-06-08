@@ -90,6 +90,7 @@ public class MemoryServiceImpl implements MemoryService {
     private MemoryDTO convertToDTO(Memory memory) {
         MemoryDTO dto = new MemoryDTO();
         dto.setId(memory.getId());
+        dto.setUserId(memory.getUserId());
         dto.setCompanionId(memory.getCompanionId());
         dto.setCategory(memory.getCategory());
         dto.setCategoryDesc(memory.getCategory().getDesc());

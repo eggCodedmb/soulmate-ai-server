@@ -11,6 +11,7 @@ import java.time.LocalDateTime;
 @Data
 public class MemoryDTO {
     private Long id;
+    private Long userId;
     private Long companionId;
     private MemoryCategory category;
     private String categoryDesc;
