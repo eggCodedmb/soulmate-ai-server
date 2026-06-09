@@ -5,6 +5,7 @@ import com.soulmate.domain.entity.Companion;
 import com.soulmate.domain.entity.Conversation;
 import com.soulmate.service.ChatService;
 import com.soulmate.domain.dto.ChatResponse;
+import com.soulmate.ai.mcp.TimeToolService;
 import com.soulmate.ai.mcp.WeatherToolService;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
@@ -29,11 +30,14 @@ public class ChatServiceImpl implements ChatService {
     private final ChatClient.Builder chatClientBuilder;
     private final PromptBuilder promptBuilder;
     private final WeatherToolService weatherToolService;
+    private final TimeToolService timeToolService;
 
-    /** 普通聊天客户端（不带天气工具） */
+    /** 普通聊天客户端（不带工具） */
     private ChatClient chatClient;
     /** 带天气工具的聊天客户端 */
     private ChatClient weatherChatClient;
+    /** 带时间工具的聊天客户端 */
+    private ChatClient timeChatClient;
 
     /** 天气相关关键词，用户消息包含其中任意一个才会注册天气工具 */
     private static final Set<String> WEATHER_KEYWORDS = Set.of(
@@ -42,11 +46,20 @@ public class ChatServiceImpl implements ChatService {
             "weather", "temperature", "rain", "snow"
     );
 
+    /** 时间相关关键词，用户消息包含其中任意一个才会注册时间工具 */
+    private static final Set<String> TIME_KEYWORDS = Set.of(
+            "几点", "时间", "日期", "今天", "星期", "几号",
+            "what time", "what date", "time", "today"
+    );
+
     @PostConstruct
     public void init() {
         chatClient = chatClientBuilder.build();
         weatherChatClient = chatClientBuilder.build().mutate()
                 .defaultTools(weatherToolService)
+                .build();
+        timeChatClient = chatClientBuilder.build().mutate()
+                .defaultTools(timeToolService)
                 .build();
     }
 
@@ -55,9 +68,8 @@ public class ChatServiceImpl implements ChatService {
                                           Companion companion, String userMessage) {
         try {
             List<Message> messages = promptBuilder.buildMessages(userId, conversation, companion, userMessage);
-            boolean useWeather = containsWeatherKeyword(userMessage);
-            log.info("聊天请求: userId={}, weatherTool={}", userId, useWeather);
-            ChatClient client = useWeather ? weatherChatClient : chatClient;
+            ChatClient client = resolveClient(userMessage);
+            log.info("聊天请求: userId={}, client={}", client == chatClient ? "default" : (client == weatherChatClient ? "weather" : "time"));
 
             return client.prompt()
                     .messages(messages)
@@ -107,9 +119,8 @@ public class ChatServiceImpl implements ChatService {
                            Companion companion, String userMessage) {
         try {
             List<Message> messages = promptBuilder.buildMessages(userId, conversation, companion, userMessage);
-            boolean useWeather = containsWeatherKeyword(userMessage);
-            log.info("聊天请求: userId={}, weatherTool={}", userId, useWeather);
-            ChatClient client = useWeather ? weatherChatClient : chatClient;
+            ChatClient client = resolveClient(userMessage);
+            log.info("聊天请求: userId={}, client={}", client == chatClient ? "default" : (client == weatherChatClient ? "weather" : "time"));
 
             org.springframework.ai.chat.model.ChatResponse response = client.prompt()
                     .messages(messages)
@@ -128,13 +139,19 @@ public class ChatServiceImpl implements ChatService {
     }
 
     /**
-     * 检测用户消息是否包含天气相关关键词
+     * 根据用户消息选择合适的 ChatClient
      */
-    private boolean containsWeatherKeyword(String message) {
+    private ChatClient resolveClient(String message) {
         if (message == null) {
-            return false;
+            return chatClient;
         }
         String lower = message.toLowerCase();
-        return WEATHER_KEYWORDS.stream().anyMatch(lower::contains);
+        if (WEATHER_KEYWORDS.stream().anyMatch(lower::contains)) {
+            return weatherChatClient;
+        }
+        if (TIME_KEYWORDS.stream().anyMatch(lower::contains)) {
+            return timeChatClient;
+        }
+        return chatClient;
     }
 }

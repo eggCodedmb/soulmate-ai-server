@@ -38,6 +38,23 @@ public class WeatherToolService {
         }
     }
 
+    @Tool(description = "获取指定城市未来3天的天气预报。当用户询问明天、后天、未来几天、周末天气、是否需要带伞等关于未来天气的问题时调用。城市名支持中文或英文，如 Beijing、上海、Tokyo")
+    public String getWeatherForecast(@ToolParam(description = "城市名称，如 Beijing、上海、Tokyo") String city) {
+        try {
+            // 1. 查询城市 ID
+            String cityId = lookupCityId(city);
+            if (cityId == null) {
+                return String.format("未找到城市「%s」，请检查城市名称是否正确。", city);
+            }
+
+            // 2. 查询3天天气预报
+            return fetchWeatherForecast(cityId, city);
+        } catch (Exception e) {
+            log.error("查询天气预报失败: city={}", city, e);
+            return String.format("查询「%s」天气预报时发生错误: %s", city, e.getMessage());
+        }
+    }
+
     /**
      * 通过 GeoAPI 查询城市 ID
      */
@@ -103,5 +120,53 @@ public class WeatherToolService {
 
         return String.format("当前%s天气：%s，气温%s°C（体感%s°C），湿度%s%%，%s%s级。",
                 cityName, text, temp, feelsLike, humidity, windDir, windScale);
+    }
+
+    /**
+     * 查询3天天气预报
+     */
+    @SuppressWarnings("unchecked")
+    private String fetchWeatherForecast(String cityId, String cityName) {
+        String baseUrl = qweatherProperties.getApiHostUrl();
+
+        RestClient restClient = RestClient.create();
+        Map<String, Object> response = restClient.get()
+                .uri(baseUrl + "/v7/weather/3d?location={location}&key={key}",
+                        cityId, qweatherProperties.getApiKey())
+                .retrieve()
+                .body(Map.class);
+
+        if (response == null || !"200".equals(String.valueOf(response.get("code")))) {
+            log.warn("天气预报查询失败: cityId={}, response={}", cityId, response);
+            return String.format("查询「%s」天气预报失败，天气服务暂时不可用。", cityName);
+        }
+
+        java.util.List<Map<String, Object>> daily =
+                (java.util.List<Map<String, Object>>) response.get("daily");
+        if (daily == null || daily.isEmpty()) {
+            return String.format("查询「%s」天气预报失败，未获取到预报数据。", cityName);
+        }
+
+        StringBuilder sb = new StringBuilder();
+        sb.append(String.format("%s未来3天天气预报：\n", cityName));
+
+        for (int i = 0; i < daily.size(); i++) {
+            Map<String, Object> day = daily.get(i);
+            String fxDate = String.valueOf(day.get("fxDate"));         // 日期
+            String textDay = String.valueOf(day.get("textDay"));       // 白天天气
+            String textNight = String.valueOf(day.get("textNight"));   // 夜间天气
+            String tempMax = String.valueOf(day.get("tempMax"));       // 最高温度
+            String tempMin = String.valueOf(day.get("tempMin"));       // 最低温度
+            String humidity = String.valueOf(day.get("humidity"));     // 湿度
+            String windDirDay = String.valueOf(day.get("windDirDay")); // 白天风向
+            String windScaleDay = String.valueOf(day.get("windScaleDay")); // 风力等级
+
+            String dayLabel = i == 0 ? "今天" : (i == 1 ? "明天" : "后天");
+            sb.append(String.format("• %s（%s）：%s转%s，气温%s~%s°C，湿度%s%%，%s%s级\n",
+                    dayLabel, fxDate, textDay, textNight, tempMin, tempMax,
+                    humidity, windDirDay, windScaleDay));
+        }
+
+        return sb.toString().trim();
     }
 }
