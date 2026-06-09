@@ -114,6 +114,13 @@ soulmate:
 
   ai:
     default-model: mimo-v2.5-pro
+    base-url: ${MIMO_BASE_URL:https://token-plan-sgp.xiaomimimo.com/v1}
+    api-key: ${MIMO_API_KEY:tp-srq4w8k0i7ru68o0r2dhwi84qu6y0q4r9zpplhkirc02yibp}
+    asr:
+      enabled: true
+      model: mimo-v2.5-asr
+      base-url: ${MIMO_BASE_URL:https://token-plan-sgp.xiaomimimo.com/v1}
+      max-size-mb: 25
 
   # 和风天气配置
   qweather:

@@ -17,4 +17,28 @@ public class AiProperties {
 
     /** 系统提示词模板路径 */
     private String systemPromptTemplate = "classpath:prompts/system-prompt.st";
+
+    /** API 基础地址 */
+    private String baseUrl = "https://token-plan-sgp.xiaomimimo.com/v1";
+
+    /** API Key */
+    private String apiKey;
+
+    /** ASR 语音识别配置 */
+    private Asr asr = new Asr();
+
+    @Data
+    public static class Asr {
+        /** 是否启用语音识别 */
+        private boolean enabled = true;
+
+        /** ASR 模型名称 */
+        private String model = "mimo-v2.5-asr";
+
+        /** ASR API 基础地址 */
+        private String baseUrl;
+
+        /** 最大音频文件大小（MB） */
+        private int maxSizeMb = 25;
+    }
 }
