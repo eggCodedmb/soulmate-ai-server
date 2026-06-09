@@ -12,9 +12,9 @@ spring:
 
   # 数据源
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/soulmate}
-    username: ${DB_USERNAME:postgres}
-    password: ${DB_PASSWORD:123456}
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 20
@@ -25,8 +25,8 @@ spring:
   # Redis
   data:
     redis:
-      host: ${REDIS_HOST:localhost}
-      port: ${REDIS_PORT:6379}
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT}
       database: 0
       timeout: 5000ms
       lettuce:
@@ -52,8 +52,8 @@ spring:
   mail:
     host: smtp.qq.com
     port: 587
-    username: ${MAIL_USERNAME:1542608903@qq.com}
-    password: ${MAIL_PASSWORD:yhmfoqepklkhgdac}
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
     properties:
       mail:
         smtp:
@@ -64,8 +64,8 @@ spring:
   # Spring AI 配置（mimo-v2.5-pro，OpenAI 兼容 API）
   ai:
     openai:
-      api-key: ${MIMO_API_KEY:tp-srq4w8k0i7ru68o0r2dhwi84qu6y0q4r9zpplhkirc02yibp}
-      base-url: ${MIMO_BASE_URL:https://token-plan-sgp.xiaomimimo.com/v1}
+      api-key: ${MIMO_API_KEY}
+      base-url: ${MIMO_BASE_URL}
       chat:
         options:
           model: mimo-v2.5-pro
@@ -80,8 +80,8 @@ spring:
     vectorstore:
       milvus:
         client:
-          host: ${MILVUS_HOST:192.168.2.114}
-          port: ${MILVUS_PORT:19530}
+          host: ${MILVUS_HOST}
+          port: ${MILVUS_PORT}
         collection-name: memory_vectors
         embedding-dimension: 384
         index-type: IVF_FLAT
@@ -105,7 +105,7 @@ mybatis-plus:
 # SoulMate 自定义配置
 soulmate:
   jwt:
-    secret: soulmate-ai-jwt-secret-key-must-be-32bytes-long!
+    secret: ${JWT_SECRET}
     expire-ms: 604800000  # 7天
 
   limits:
@@ -114,18 +114,18 @@ soulmate:
 
   ai:
     default-model: mimo-v2.5-pro
-    base-url: ${MIMO_BASE_URL:https://token-plan-sgp.xiaomimimo.com/v1}
-    api-key: ${MIMO_API_KEY:tp-srq4w8k0i7ru68o0r2dhwi84qu6y0q4r9zpplhkirc02yibp}
+    base-url: ${MIMO_BASE_URL}
+    api-key: ${MIMO_API_KEY}
     asr:
       enabled: true
       model: mimo-v2.5-asr
-      base-url: ${MIMO_BASE_URL:https://token-plan-sgp.xiaomimimo.com/v1}
+      base-url: ${MIMO_BASE_URL}
       max-size-mb: 25
 
   # 和风天气配置
   qweather:
-    api-key: ${QWEATHER_API_KEY:8aa00a9a13914c71880c874f4088114f}
-    api-host-url: ${QWEATHER_API_HOST:https://n52pg8udbn.re.qweatherapi.com}
+    api-key: ${QWEATHER_API_KEY}
+    api-host-url: ${QWEATHER_API_HOST}
   # 文件上传配置
   file:
     base-dir: D:/Code/soulmate-ai-server/online
@@ -135,12 +135,12 @@ soulmate:
 
   # 支付宝沙箱配置
   alipay:
-    app-id: ${ALIPAY_APP_ID:9021000164621377}
-    private-key: ${ALIPAY_PRIVATE_KEY:MIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQDLFw1n3vTWrzeaEQExXbhWn++kuw1HSsb00PLYxEIz0fSBIBGQwtxCKHTqMb2xV+UBi0y+Z25OVf356Wp1viP88L2iIfOThS2OqFQNK5JlGYpAaJsx67AW+8zTHzW23vJyaPfMRpS5xdXoYCPoZrKLdJvQ+CixuedVucpTVS22xn/uh1quTOTYXroI3T+iBB7gy3oE3TDoKoHiRdVUo4/O7WbRt2vDmbwtzDSQxqWK3388VrpLkwoGNjTH5D66XJKoTaSMMqC5oUYgzJFMYkAZlCVg3vycPqrxulu4H72vl4PGzNQonoBc4zmpzUq8QyeIQBw1hXjKtlfegep21NV3AgMBAAECggEARCAXfyBrQRjFrgjGPakSjPxZhwi4C5Ip6zWsQMqU6o0jV61KNyUmfYrUrTrCRxsU1s/DjptjhSOTbqG99IEz0UVwV1LMQlAKWDBfAYv8L63BkpmEddp51zvgGXH+srlW2sobVYrXmPmkJ68YXH0Wp3EWU6LrA7M4xqjsFcgc7ZJPOu4/YWBrkdRNVJTrQM6uDHHouMFIbXhhYo2lgX+hz9CQ3UP+DSKo4+L195m+dPJhh4I6BSfHHQB7HVoQ4gH0sK7nY1y3NAoLtmO3Tubmhdkw0vX6mGvpy7+ap7UilzpWeF02gQlEAGgJkle+JQ8GZYXwqBq+oqle9t4dzbxVAQKBgQD01inaEPmZ1ngnvw5sxnXvuGK7TmpQCCBMaxZjZ/1GsnUEw589KtatrDvJnua0wB/GQ5I0JNOk/Nj+Ibqy+04uQKQPhvc0MzOrIKEbwInzwZrmWF99iMRRoF+xUVxFqicvN7BB9E83VkpSrtMFMCsD4CsPTBb06PvIIAgFi3pqjQKBgQDUWZsNqUCCsKr1raXV9VZ9GGLosju29+ELyhuZ/hqCUSucxTAVzarzmaW6wIEI15hVjKjuZzFHK47dnVhVA8Y1m8oX+aH2NG8ZUZjar6OB2sWPAhWCon5sC+9FtHXXRZFV1PAN8H4ttffO0xclKk+HSItKO6a0Wr3lcn4gB73hEwKBgD3iZ/+zbLOCryo0s3uxChxGecYoQtzpwOgv5R/JKA6XitZib7xxOIP7Vb1Xia7EJQPjDnBZoplAQ8SwV9VnidJNCmrWTWOHUZb+j1pJZ1USaYmxaql7SUvsgmN6Uh1VrcPUipuRGfi9udl+UN4t16GKJrgeHmtW/FUQK5bjM1T9AoGABOSDpA7wQ5KafcqgdYuPkJZNQRtKMO8JKmJfvG6UYchI/vW0I+x3MeGqZeEll/SPt/jjs4qBIiioxAZqEJtjp7yNLXw89RVEMgslQHSnichmoOLlZ/sieo7T1oFP7cPWk2mylj+iSJ9WtFc8w0h0SKOtQeqZ7rHgijbXHRnQkC0CgYBgG70YeWj33AJ1FnS+lKcpUmzyW5oPmlifb8S1Un24pSJiEDnggLIoAPramQpuWgtG8rGOZ9oUZ7++dLSa17zgJU457j+Y0DylZdzg4KnuWHq06o2UE8gxv0w8zMax8nCpV3jWbARZjuOJTR9fQQei7P2HeSbhSRYfDqpbkqM9UA==}
-    alipay-public-key: ${ALIPAY_PUBLIC_KEY:MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAiazNAhgIrf0YM/+fwlVbCVvcygiNAE2Kw1NiXrOv7XJglTHFkSPPPACAxY40q9PpSMCuZzCivT7OpNe2sphwITp5FgCSpVVArQj9YTmUzGhmUZv5NftMgHIZi5O3u/Ixbo/cDTg6/wmPr3P+mBXqmgEMAfnI9qx8IgU1qcyL/ukUUVr3z4fkpz7mc6X/SGEvFpWgLIaDGxM+4M51PqtJiYETJN3DBzxVc5n7MSZzKop7VSeyDQutqOpVJ0w1BViPnJfyRyLPtLWoatqKQxdLO/AMYAAXjvo71AQ2mHp3GCHvZxG1N613hV7cStA6h2iGSYo9r1TTyLC+8u6B+OA8PQIDAQAB}
+    app-id: ${ALIPAY_APP_ID}
+    private-key: ${ALIPAY_PRIVATE_KEY}
+    alipay-public-key: ${ALIPAY_PUBLIC_KEY}
     gateway: https://openapi-sandbox.dl.alipaydev.com/gateway.do
-    notify-url: ${ALIPAY_NOTIFY_URL:https://cupid-discard-ritzy.ngrok-free.dev/api/alipay/notify}
-    return-url: ${ALIPAY_RETURN_URL:}
+    notify-url: ${ALIPAY_NOTIFY_URL}
+    return-url: ${ALIPAY_RETURN_URL}
 
 # Actuator
 management:
