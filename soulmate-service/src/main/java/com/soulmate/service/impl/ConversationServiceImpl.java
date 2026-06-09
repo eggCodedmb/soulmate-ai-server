@@ -158,8 +158,13 @@ public class ConversationServiceImpl implements ConversationService {
                         // 1. 解析并自动创建定时提醒
                         companionReminderService.parseAndCreateReminder(userId, companion.getId(), aiReply);
 
-                        // 2. 清洗过滤控制指令标签
-                        String cleanReply = aiReply.replaceAll("<command.*?>.*?</command>", "").trim();
+                        // 2. 清洗过滤控制指令标签和 tool call 残留
+                        String cleanReply = aiReply
+                                .replaceAll("<command.*?>.*?</command>", "")
+                                .replaceAll("(?s)<tool_call>.*?</tool_call>", "")
+                                .replaceAll("(?s)<function=.*?</function>", "")
+                                .replaceAll("(?s)<query [^>]*>.*?</query>", "")
+                                .trim();
 
                         // 保存AI回复消息
                         Message aiMessage = new Message();
@@ -170,6 +175,15 @@ public class ConversationServiceImpl implements ConversationService {
                         aiMessage.setReadStatus(0);
                         aiMessage.setCreateTime(LocalDateTime.now());
                         messageMapper.insert(aiMessage);
+
+                        // 保存assistant回复到Redis上下文
+                        try {
+                            String ctxKey = COMPANION_CONTEXT + conversation.getId();
+                            redisTemplate.opsForList().rightPush(ctxKey, "assistant:" + cleanReply);
+                            redisTemplate.opsForList().trim(ctxKey, -(conversation.getContextWindow() * 2L), -1);
+                        } catch (Exception e) {
+                            log.warn("保存assistant上下文失败: conversationId={}", conversation.getId(), e);
+                        }
 
                         // 更新会话最后消息
                         conversation.setLastMessagePreview(
@@ -209,8 +223,13 @@ public class ConversationServiceImpl implements ConversationService {
         // 1. 解析并自动创建定时提醒
         companionReminderService.parseAndCreateReminder(userId, companion.getId(), aiReply);
 
-        // 2. 清洗过滤控制指令标签
-        String cleanReply = aiReply.replaceAll("<command.*?>.*?</command>", "").trim();
+        // 2. 清洗过滤控制指令标签和 tool call 残留
+        String cleanReply = aiReply
+                .replaceAll("<command.*?>.*?</command>", "")
+                .replaceAll("(?s)<tool_call>.*?</tool_call>", "")
+                .replaceAll("(?s)<function=.*?</function>", "")
+                .replaceAll("(?s)<query [^>]*>.*?</query>", "")
+                .trim();
 
         // 保存AI回复
         Message aiMessage = new Message();
@@ -221,6 +240,15 @@ public class ConversationServiceImpl implements ConversationService {
         aiMessage.setReadStatus(0);
         aiMessage.setCreateTime(LocalDateTime.now());
         messageMapper.insert(aiMessage);
+
+        // 保存assistant回复到Redis上下文
+        try {
+            String ctxKey = COMPANION_CONTEXT + conversation.getId();
+            redisTemplate.opsForList().rightPush(ctxKey, "assistant:" + cleanReply);
+            redisTemplate.opsForList().trim(ctxKey, -(conversation.getContextWindow() * 2L), -1);
+        } catch (Exception e) {
+            log.warn("保存assistant上下文失败: conversationId={}", conversation.getId(), e);
+        }
 
         // 更新会话
         conversation.setLastMessagePreview(

@@ -24,7 +24,7 @@
         <!-- Spring AI - OpenAI 兼容（用于 mimo-v2.5-pro 等） -->
         <dependency>
             <groupId>org.springframework.ai</groupId>
-            <artifactId>spring-ai-openai-spring-boot-starter</artifactId>
+            <artifactId>spring-ai-starter-model-openai</artifactId>
         </dependency>
     </dependencies>
 

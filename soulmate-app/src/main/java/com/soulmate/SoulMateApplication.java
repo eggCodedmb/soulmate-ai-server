@@ -1,6 +1,5 @@
 package com.soulmate;
 
-import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
@@ -10,8 +9,9 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 /**
  * SoulMate AI 启动入口
  */
-@SpringBootApplication
-@MapperScan("com.soulmate.mapper")
+@SpringBootApplication(exclude = {
+        org.springframework.ai.vectorstore.milvus.autoconfigure.MilvusVectorStoreAutoConfiguration.class
+})
 @EnableAsync
 @EnableScheduling
 @ConfigurationPropertiesScan

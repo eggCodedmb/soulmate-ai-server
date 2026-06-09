@@ -23,7 +23,6 @@ import com.soulmate.mapper.MessageMapper;
 import com.soulmate.service.MemoryService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.document.Document;
@@ -31,6 +30,8 @@ import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.ai.vectorstore.filter.Filter;
 import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.lang.Nullable;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -47,7 +48,6 @@ import java.util.stream.Collectors;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class MemoryServiceImpl implements MemoryService {
 
     private final MemoryMapper memoryMapper;
@@ -59,6 +59,22 @@ public class MemoryServiceImpl implements MemoryService {
     private final ChatClient.Builder chatClientBuilder;
     private final ObjectMapper objectMapper;
     private final VectorStore vectorStore;
+
+    public MemoryServiceImpl(MemoryMapper memoryMapper, MemoryTagMapper memoryTagMapper,
+                             MessageMapper messageMapper, ConversationMapper conversationMapper,
+                             CompanionMapper companionMapper, CompanionPersonalityMapper personalityMapper,
+                             ChatClient.Builder chatClientBuilder, ObjectMapper objectMapper,
+                             @Nullable VectorStore vectorStore) {
+        this.memoryMapper = memoryMapper;
+        this.memoryTagMapper = memoryTagMapper;
+        this.messageMapper = messageMapper;
+        this.conversationMapper = conversationMapper;
+        this.companionMapper = companionMapper;
+        this.personalityMapper = personalityMapper;
+        this.chatClientBuilder = chatClientBuilder;
+        this.objectMapper = objectMapper;
+        this.vectorStore = vectorStore;
+    }
 
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy年MM月dd日");
 
@@ -113,15 +129,17 @@ public class MemoryServiceImpl implements MemoryService {
         memoryMapper.insert(memory);
 
         // 同步到向量库
-        try {
-            Document doc = new Document(memory.getId().toString(), memory.getContent(), Map.of(
-                    "userId", userId,
-                    "companionId", memory.getCompanionId(),
-                    "category", memory.getCategory().getCode()
-            ));
-            vectorStore.add(List.of(doc));
-        } catch (Exception e) {
-            log.warn("手动保存记忆同步向量库失败: {}", memory.getTitle(), e);
+        if (vectorStore != null) {
+            try {
+                Document doc = new Document(memory.getId().toString(), memory.getContent(), Map.of(
+                        "userId", userId,
+                        "companionId", memory.getCompanionId(),
+                        "category", memory.getCategory().getCode()
+                ));
+                vectorStore.add(List.of(doc));
+            } catch (Exception e) {
+                log.warn("手动保存记忆同步向量库失败: {}", memory.getTitle(), e);
+            }
         }
     }
 
@@ -161,15 +179,17 @@ public class MemoryServiceImpl implements MemoryService {
         memoryMapper.updateById(existing);
 
         // 同步更新向量库
-        try {
-            Document doc = new Document(existing.getId().toString(), existing.getContent(), Map.of(
-                    "userId", userId,
-                    "companionId", existing.getCompanionId(),
-                    "category", existing.getCategory().getCode()
-            ));
-            vectorStore.add(List.of(doc));
-        } catch (Exception e) {
-            log.warn("同步更新向量库失败: memoryId={}", memoryId, e);
+        if (vectorStore != null) {
+            try {
+                Document doc = new Document(existing.getId().toString(), existing.getContent(), Map.of(
+                        "userId", userId,
+                        "companionId", existing.getCompanionId(),
+                        "category", existing.getCategory().getCode()
+                ));
+                vectorStore.add(List.of(doc));
+            } catch (Exception e) {
+                log.warn("同步更新向量库失败: memoryId={}", memoryId, e);
+            }
         }
     }
 
@@ -183,10 +203,12 @@ public class MemoryServiceImpl implements MemoryService {
         memoryMapper.deleteById(memoryId);
 
         // 同步从向量库删除
-        try {
-            vectorStore.delete(List.of(memoryId.toString()));
-        } catch (Exception e) {
-            log.warn("从向量库删除记忆失败: memoryId={}", memoryId, e);
+        if (vectorStore != null) {
+            try {
+                vectorStore.delete(List.of(memoryId.toString()));
+            } catch (Exception e) {
+                log.warn("从向量库删除记忆失败: memoryId={}", memoryId, e);
+            }
         }
     }
 
@@ -299,16 +321,18 @@ public class MemoryServiceImpl implements MemoryService {
                         memoryMapper.insert(memory);
                         
                         // 同步到向量库
-                        try {
-                            Document doc = new Document(memory.getId().toString(), memory.getContent(), Map.of(
-                                    "userId", userId,
-                                    "companionId", companionId,
-                                    "category", category.getCode()
-                            ));
-                            vectorStore.add(List.of(doc));
-                            log.info("提取新记忆并同步向量库成功: title={}", memory.getTitle());
-                        } catch (Exception ve) {
-                            log.warn("记忆同步向量库失败: title={}", memory.getTitle(), ve);
+                        if (vectorStore != null) {
+                            try {
+                                Document doc = new Document(memory.getId().toString(), memory.getContent(), Map.of(
+                                        "userId", userId,
+                                        "companionId", companionId,
+                                        "category", category.getCode()
+                                ));
+                                vectorStore.add(List.of(doc));
+                                log.info("提取新记忆并同步向量库成功: title={}", memory.getTitle());
+                            } catch (Exception ve) {
+                                log.warn("记忆同步向量库失败: title={}", memory.getTitle(), ve);
+                            }
                         }
                     }
                 } catch (Exception e) {
@@ -323,33 +347,35 @@ public class MemoryServiceImpl implements MemoryService {
 
     @Override
     public List<Memory> retrieveRelevantMemories(Long userId, Long companionId, String query) {
-        // 1. 语义搜索 (SimpleVectorStore)
+        // 1. 语义搜索 (VectorStore)
         List<Long> memoryIdsFromVector = Collections.emptyList();
-        try {
-            // 构建过滤表达式: userId == userId AND companionId == companionId
-            FilterExpressionBuilder b = new FilterExpressionBuilder();
-            Filter.Expression filterExpression = b.and(
-                    b.eq("userId", userId),
-                    b.eq("companionId", companionId)
-            ).build();
+        if (vectorStore != null) {
+            try {
+                // 构建过滤表达式: userId == userId AND companionId == companionId
+                FilterExpressionBuilder b = new FilterExpressionBuilder();
+                Filter.Expression filterExpression = b.and(
+                        b.eq("userId", userId),
+                        b.eq("companionId", companionId)
+                ).build();
 
-            SearchRequest searchRequest = SearchRequest.builder()
-                    .query(query)
-                    .topK(5)
-                    .similarityThreshold(0.6)
-                    .filterExpression(filterExpression)
-                    .build();
+                SearchRequest searchRequest = SearchRequest.builder()
+                        .query(query)
+                        .topK(5)
+                        .similarityThreshold(0.6)
+                        .filterExpression(filterExpression)
+                        .build();
 
-            List<Document> results = vectorStore.similaritySearch(searchRequest);
-            memoryIdsFromVector = results.stream()
-                    .map(doc -> Long.parseLong(doc.getId()))
-                    .collect(Collectors.toList());
-            
-            if (!memoryIdsFromVector.isEmpty()) {
-                log.debug("语义检索命中记忆: count={}, ids={}", memoryIdsFromVector.size(), memoryIdsFromVector);
+                List<Document> results = vectorStore.similaritySearch(searchRequest);
+                memoryIdsFromVector = results.stream()
+                        .map(doc -> Long.parseLong(doc.getId()))
+                        .collect(Collectors.toList());
+
+                if (!memoryIdsFromVector.isEmpty()) {
+                    log.debug("语义检索命中记忆: count={}, ids={}", memoryIdsFromVector.size(), memoryIdsFromVector);
+                }
+            } catch (Exception e) {
+                log.warn("向量检索失败，回退到关键词搜索: userId={}, query={}", userId, query, e);
             }
-        } catch (Exception e) {
-            log.warn("向量检索失败，回退到关键词搜索: userId={}, query={}", userId, query, e);
         }
 
         // 2. 加载完整记忆数据 (如果语义搜索没中，回退到关键词匹配和高重要性记忆)

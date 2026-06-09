@@ -12,9 +12,9 @@ spring:
 
   # 数据源
   datasource:
-    url: jdbc:postgresql://localhost:5432/soulmate
-    username: postgres
-    password: 123456
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/soulmate}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:123456}
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 20
@@ -25,8 +25,8 @@ spring:
   # Redis
   data:
     redis:
-      host: localhost
-      port: 6379
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
       database: 0
       timeout: 5000ms
       lettuce:
@@ -64,23 +64,26 @@ spring:
   # Spring AI 配置（mimo-v2.5-pro，OpenAI 兼容 API）
   ai:
     openai:
-      api-key: tp-srq4w8k0i7ru68o0r2dhwi84qu6y0q4r9zpplhkirc02yibp
-      base-url: https://token-plan-sgp.xiaomimimo.com
+      api-key: ${MIMO_API_KEY:tp-srq4w8k0i7ru68o0r2dhwi84qu6y0q4r9zpplhkirc02yibp}
+      base-url: ${MIMO_BASE_URL:https://token-plan-sgp.xiaomimimo.com/v1}
       chat:
         options:
           model: mimo-v2.5-pro
           temperature: 0.7
           max-tokens: 2048
-      embedding:
-        options:
-          model: mimo-embedding-v1
+    embedding:
+      transformer:
+        onnx:
+          modelUri: file:///D:/Code/models/e5-small-v2/model.onnx
+        tokenizer:
+          uri: file:///D:/Code/models/e5-small-v2/tokenizer.json
     vectorstore:
       milvus:
         client:
-          host: 192.168.2.114
-          port: 19530
+          host: ${MILVUS_HOST:192.168.2.114}
+          port: ${MILVUS_PORT:19530}
         collection-name: memory_vectors
-        embedding-dimension: 1536
+        embedding-dimension: 384
         index-type: IVF_FLAT
         metric-type: COSINE
         initialize-schema: true
@@ -111,11 +114,11 @@ soulmate:
 
   ai:
     default-model: mimo-v2.5-pro
-    api-key: ${MIMO_API_KEY:your-api-key-here}
-    base-url: https://token-plan-sgp.xiaomimimo.com/v1
-    temperature: 0.7
-    max-tokens: 2048
 
+  # 和风天气配置
+  qweather:
+    api-key: ${QWEATHER_API_KEY:8aa00a9a13914c71880c874f4088114f}
+    api-host-url: ${QWEATHER_API_HOST:https://n52pg8udbn.re.qweatherapi.com}
   # 文件上传配置
   file:
     base-dir: D:/Code/soulmate-ai-server/online

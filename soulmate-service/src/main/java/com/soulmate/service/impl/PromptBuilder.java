@@ -116,7 +116,8 @@ public class PromptBuilder {
         prompt.append("- 适当使用 emoji 表达情感，但不要过多\n");
         prompt.append("- 记住用户之前分享的信息，在对话中自然引用\n");
         prompt.append("- 当用户情绪低落时，给予温暖的支持和安慰\n");
-        prompt.append("- 当用户开心时，一起分享快乐\n\n");
+        prompt.append("- 当用户开心时，一起分享快乐\n");
+        prompt.append("- 天气查询工具仅在用户明确询问天气时使用，日常对话中不要主动提及或查询天气\n\n");
 
         // 定时任务/叫醒来电自动创建规范
         prompt.append("## 定时任务/叫醒来电自动创建规范\n");
@@ -148,10 +149,15 @@ public class PromptBuilder {
                     // 格式: "role:content"
                     String[] parts = json.split(":", 2);
                     if (parts.length == 2) {
+                        String content = parts[1];
+                        // 过滤掉 tool call 残留，避免 LLM 从历史中学到错误行为
+                        if (isToolCallArtifact(content)) {
+                            continue;
+                        }
                         if ("user".equals(parts[0])) {
-                            messages.add(new UserMessage(parts[1]));
+                            messages.add(new UserMessage(content));
                         } else if ("assistant".equals(parts[0])) {
-                            messages.add(new AssistantMessage(parts[1]));
+                            messages.add(new AssistantMessage(content));
                         }
                     }
                 }
@@ -160,6 +166,19 @@ public class PromptBuilder {
             log.warn("加载对话上下文失败: conversationId={}", conversationId, e);
         }
         return messages;
+    }
+
+    /**
+     * 判断内容是否为 tool call 残留（原始 XML/JSON 标签）
+     */
+    private boolean isToolCallArtifact(String content) {
+        if (content == null) {
+            return false;
+        }
+        return content.contains("<tool_call>")
+                || content.contains("<function=")
+                || content.contains("<query ")
+                || content.contains("</tool_call>");
     }
 
     /**
