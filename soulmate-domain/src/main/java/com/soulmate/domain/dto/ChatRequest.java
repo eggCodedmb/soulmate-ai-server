@@ -27,4 +27,18 @@ public class ChatRequest {
 
     /** 场景模式（可选，切换场景时传入） */
     private String sceneMode;
+
+    // ===== LLM 模型切换（可选，不传则使用系统默认模型） =====
+
+    /** LLM 提供商类型：system（默认）| openai（OpenAI 协议，含 Ollama） */
+    private String llmProviderType;
+
+    /** LLM Base URL（如 https://api.deepseek.com/v1 或 http://localhost:11434/v1） */
+    private String llmBaseUrl;
+
+    /** LLM API Key（Ollama 等本地模型可不传） */
+    private String llmApiKey;
+
+    /** LLM 模型名称（如 deepseek-chat、qwen2.5:7b） */
+    private String llmModel;
 }

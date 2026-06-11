@@ -42,6 +42,12 @@ public class UserSettings {
     /** 当前使用的模型名称 */
     private String modelName;
 
+    /** LLM 提供商类型：system / openai */
+    private String llmProviderType;
+
+    /** LLM API Key（建议加密存储） */
+    private String llmApiKey;
+
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
 

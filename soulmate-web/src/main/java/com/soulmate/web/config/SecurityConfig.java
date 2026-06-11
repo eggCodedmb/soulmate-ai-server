@@ -46,7 +46,8 @@ public class SecurityConfig {
             "/actuator/**",
             "/ws/**",
             "/api/alipay/notify",
-            "/files/**"
+            "/files/**",
+            "/error"
     );
 
     @Bean

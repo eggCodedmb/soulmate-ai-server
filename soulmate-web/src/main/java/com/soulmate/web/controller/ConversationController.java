@@ -57,7 +57,10 @@ public class ConversationController {
      */
     @PostMapping(value = "/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<ChatResponse> streamChat(@RequestAttribute("currentUserId") Long userId,
-                                          @Valid @RequestBody ChatRequest request) {
+                                          @Valid @RequestBody ChatRequest request,
+                                          jakarta.servlet.http.HttpServletResponse response) {
+        // 显式禁用缓冲，确保逐字输出
+        response.setHeader("X-Accel-Buffering", "no");
         return conversationService.sendMessage(userId, request);
     }
 

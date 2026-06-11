@@ -146,7 +146,7 @@ public class ConversationServiceImpl implements ConversationService {
         StringBuilder fullContent = new StringBuilder();
 
         // 调用 AI 服务流式生成回复
-        return chatService.streamChat(userId, conversation, companion, request.getContent())
+        return chatService.streamChat(userId, conversation, companion, request.getContent(), request)
                 .doOnNext(res -> {
                     if (res.getContent() != null) {
                         fullContent.append(res.getContent());
@@ -218,7 +218,7 @@ public class ConversationServiceImpl implements ConversationService {
 
         // 获取伴侣信息并调用AI
         Companion companion = companionMapper.selectById(request.getCompanionId());
-        String aiReply = chatService.chatSync(userId, conversation, companion, request.getContent());
+        String aiReply = chatService.chatSync(userId, conversation, companion, request.getContent(), request);
 
         // 1. 解析并自动创建定时提醒
         companionReminderService.parseAndCreateReminder(userId, companion.getId(), aiReply);

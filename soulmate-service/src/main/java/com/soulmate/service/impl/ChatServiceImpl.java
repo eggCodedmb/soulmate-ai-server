@@ -4,6 +4,7 @@ import com.soulmate.service.impl.PromptBuilder;
 import com.soulmate.domain.entity.Companion;
 import com.soulmate.domain.entity.Conversation;
 import com.soulmate.service.ChatService;
+import com.soulmate.domain.dto.ChatRequest;
 import com.soulmate.domain.dto.ChatResponse;
 import com.soulmate.ai.mcp.TimeToolService;
 import com.soulmate.ai.mcp.WeatherToolService;
@@ -31,6 +32,7 @@ public class ChatServiceImpl implements ChatService {
     private final PromptBuilder promptBuilder;
     private final WeatherToolService weatherToolService;
     private final TimeToolService timeToolService;
+    private final DynamicLlmService dynamicLlmService;
 
     /** 普通聊天客户端（不带工具） */
     private ChatClient chatClient;
@@ -65,11 +67,18 @@ public class ChatServiceImpl implements ChatService {
 
     @Override
     public Flux<ChatResponse> streamChat(Long userId, Conversation conversation,
-                                          Companion companion, String userMessage) {
+                                          Companion companion, String userMessage,
+                                          ChatRequest request) {
         try {
             List<Message> messages = promptBuilder.buildMessages(userId, conversation, companion, userMessage);
-            ChatClient client = resolveClient(userMessage);
-            log.info("聊天请求: userId={}, client={}", client == chatClient ? "default" : (client == weatherChatClient ? "weather" : "time"));
+            // 1. 先按关键词选择工具增强的 client（系统默认）
+            ChatClient toolClient = resolveClient(userMessage);
+            // 2. 再根据 LLM 配置决定最终 client
+            ChatClient client = dynamicLlmService.resolveChatClient(request, toolClient);
+            log.info("聊天请求: userId={}, llmType={}, model={}",
+                    userId,
+                    request != null && request.getLlmProviderType() != null ? request.getLlmProviderType() : "system",
+                    request != null && request.getLlmModel() != null ? request.getLlmModel() : "default");
 
             return client.prompt()
                     .messages(messages)
@@ -116,11 +125,16 @@ public class ChatServiceImpl implements ChatService {
 
     @Override
     public String chatSync(Long userId, Conversation conversation,
-                           Companion companion, String userMessage) {
+                           Companion companion, String userMessage,
+                           ChatRequest request) {
         try {
             List<Message> messages = promptBuilder.buildMessages(userId, conversation, companion, userMessage);
-            ChatClient client = resolveClient(userMessage);
-            log.info("聊天请求: userId={}, client={}", client == chatClient ? "default" : (client == weatherChatClient ? "weather" : "time"));
+            ChatClient toolClient = resolveClient(userMessage);
+            ChatClient client = dynamicLlmService.resolveChatClient(request, toolClient);
+            log.info("聊天请求: userId={}, llmType={}, model={}",
+                    userId,
+                    request != null && request.getLlmProviderType() != null ? request.getLlmProviderType() : "system",
+                    request != null && request.getLlmModel() != null ? request.getLlmModel() : "default");
 
             org.springframework.ai.chat.model.ChatResponse response = client.prompt()
                     .messages(messages)
