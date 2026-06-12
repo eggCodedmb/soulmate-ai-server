@@ -26,6 +26,12 @@
             <groupId>org.springframework.ai</groupId>
             <artifactId>spring-ai-starter-model-openai</artifactId>
         </dependency>
+
+        <!-- Spring AI - Ollama 原生支持（用于解决推理模型内容为空的问题） -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-starter-model-ollama</artifactId>
+        </dependency>
     </dependencies>
 
     <repositories>

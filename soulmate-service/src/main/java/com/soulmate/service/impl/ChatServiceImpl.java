@@ -16,8 +16,10 @@ import org.springframework.ai.chat.messages.Message;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * AI 聊天服务实现
@@ -71,39 +73,47 @@ public class ChatServiceImpl implements ChatService {
                                           ChatRequest request) {
         try {
             List<Message> messages = promptBuilder.buildMessages(userId, conversation, companion, userMessage);
-            // 1. 先按关键词选择工具增强的 client（系统默认）
-            ChatClient toolClient = resolveClient(userMessage);
-            // 2. 再根据 LLM 配置决定最终 client
-            ChatClient client = dynamicLlmService.resolveChatClient(request, toolClient);
             log.info("聊天请求: userId={}, llmType={}, model={}",
                     userId,
                     request != null && request.getLlmProviderType() != null ? request.getLlmProviderType() : "system",
                     request != null && request.getLlmModel() != null ? request.getLlmModel() : "default");
 
+            // 使用 DynamicLlmService 解析 ChatClient（已集成原生 Ollama 支持）
+            ChatClient toolClient = resolveClient(userMessage);
+            ChatClient client = dynamicLlmService.resolveChatClient(request, toolClient);
+
+            AtomicInteger chunkCount = new AtomicInteger(0);
+
             return client.prompt()
                     .messages(messages)
                     .stream()
                     .chatResponse()
+                    .timeout(Duration.ofSeconds(60))
                     .map(response -> {
                         String content = "";
                         if (response.getResult() != null && response.getResult().getOutput() != null) {
                             content = response.getResult().getOutput().getText();
-                            // 调试：检查是否有 tool call 泄漏到文本流
-                            if (content != null && (content.contains("<tool_call>") || content.contains("<function="))) {
-                                log.warn("检测到tool call文本泄漏: {}", content);
-                            }
                         }
+                        int count = chunkCount.incrementAndGet();
+                        log.info("SSE Chunk #{}: content=[{}]", count,
+                                content != null ? content.replace("\n", "\\n") : "null");
                         return ChatResponse.builder()
                                 .conversationId(conversation.getId())
-                                .content(content)
+                                .content(content != null ? content : "")
                                 .done(false)
                                 .build();
                     })
+                    .doOnComplete(() -> log.info("SSE流完成: userId={}, conversationId={}, totalChunks={}",
+                            userId, conversation.getId(), chunkCount.get()))
                     .onErrorResume(e -> {
-                        log.error("AI流式响应异常: userId={}, conversationId={}", userId, conversation.getId(), e);
+                        String errorMsg = e instanceof java.util.concurrent.TimeoutException
+                                ? "AI响应超时，请检查模型服务是否正常运行"
+                                : "AI服务暂时不可用，请稍后再试";
+                        log.error("AI流式响应异常: userId={}, conversationId={}, errorType={}, msg={}, chunksBeforeError={}",
+                                userId, conversation.getId(), e.getClass().getSimpleName(), e.getMessage(), chunkCount.get());
                         return Flux.just(ChatResponse.builder()
                                 .conversationId(conversation.getId())
-                                .error("AI服务暂时不可用，请稍后再试")
+                                .error(errorMsg)
                                 .done(true)
                                 .build());
                     })

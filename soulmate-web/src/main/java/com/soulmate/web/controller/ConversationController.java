@@ -10,6 +10,7 @@ import com.soulmate.domain.dto.ChatResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 
@@ -56,12 +57,13 @@ public class ConversationController {
      * 发送消息（SSE流式AI回复）
      */
     @PostMapping(value = "/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public Flux<ChatResponse> streamChat(@RequestAttribute("currentUserId") Long userId,
-                                          @Valid @RequestBody ChatRequest request,
-                                          jakarta.servlet.http.HttpServletResponse response) {
-        // 显式禁用缓冲，确保逐字输出
-        response.setHeader("X-Accel-Buffering", "no");
-        return conversationService.sendMessage(userId, request);
+    public ResponseEntity<Flux<ChatResponse>> streamChat(@RequestAttribute("currentUserId") Long userId,
+                                                          @Valid @RequestBody ChatRequest request) {
+        Flux<ChatResponse> flux = conversationService.sendMessage(userId, request);
+        // 使用 ResponseEntity 安全地设置 Header，避免破坏 Spring Security 异步上下文
+        return ResponseEntity.ok()
+                .header("X-Accel-Buffering", "no")
+                .body(flux);
     }
 
     /**

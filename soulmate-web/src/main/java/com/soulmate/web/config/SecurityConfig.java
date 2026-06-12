@@ -20,6 +20,8 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.context.RequestAttributeSecurityContextRepository;
+import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.stereotype.Component;
 import org.springframework.util.AntPathMatcher;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -56,6 +58,8 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .securityContext(securityContext -> securityContext
+                        .securityContextRepository(new RequestAttributeSecurityContextRepository()))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(WHITE_LIST.toArray(new String[0])).permitAll()
                         .anyRequest().authenticated())
@@ -74,6 +78,7 @@ public class SecurityConfig {
 
         private final JwtProperties jwtProperties;
         private final AntPathMatcher pathMatcher = new AntPathMatcher();
+        private final SecurityContextRepository securityContextRepository = new RequestAttributeSecurityContextRepository();
 
         @Override
         protected void doFilterInternal(HttpServletRequest request,
@@ -103,6 +108,8 @@ public class SecurityConfig {
                     var authentication = new UsernamePasswordAuthenticationToken(
                             userId, null, authorities);
                     SecurityContextHolder.getContext().setAuthentication(authentication);
+                    // 保存到 request attribute，确保异步分派时 SecurityContext 不丢失
+                    securityContextRepository.saveContext(SecurityContextHolder.getContext(), request, response);
                 } catch (Exception e) {
                     log.warn("Token解析失败: {}", e.getMessage());
                     response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);

@@ -1,17 +1,22 @@
 package com.soulmate.service.impl;
 
+import com.soulmate.domain.dto.ChatRequest;
+import com.soulmate.domain.dto.ChatResponse;
 import com.openai.client.OpenAIClient;
 import com.openai.client.OpenAIClientAsync;
 import com.openai.client.okhttp.OpenAIOkHttpClient;
 import com.openai.client.okhttp.OpenAIOkHttpClientAsync;
-import com.soulmate.domain.dto.ChatRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.ollama.OllamaChatModel;
+import org.springframework.ai.ollama.api.OllamaApi;
+import org.springframework.ai.ollama.api.OllamaChatOptions;
 import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -54,23 +59,48 @@ public class DynamicLlmService {
         String cacheKey = baseUrl + "::" + (model != null ? model : "default");
 
         return modelCache.computeIfAbsent(cacheKey, k -> {
-            String effectiveKey = (apiKey != null && !apiKey.isEmpty()) ? apiKey : "ollama";
             String effectiveModel = (model != null && !model.isBlank()) ? model : "gpt-4o";
-            log.info("创建动态 ChatModel: baseUrl={}, model={}", baseUrl, effectiveModel);
+
+            // 检测是否为 Ollama URL
+            if (isOllamaUrl(baseUrl)) {
+                log.info("创建动态 Ollama ChatModel: baseUrl={}, model={}", baseUrl, effectiveModel);
+                // 移除 /v1 后缀，Ollama 内部 API 使用基础 URL
+                String nativeUrl = baseUrl.replaceAll("/v1/?$", "");
+                
+                OllamaApi ollamaApi = OllamaApi.builder()
+                        .baseUrl(nativeUrl)
+                        .build();
+
+                return OllamaChatModel.builder()
+                        .ollamaApi(ollamaApi)
+                        .defaultOptions(OllamaChatOptions.builder()
+                                .model(effectiveModel)
+                                .disableThinking() // 禁用 thinking 模式，解决推理模型 content 为空的问题
+                                .temperature(0.7)
+                                .numPredict(2048)
+                                .build())
+                        .build();
+            }
+
+            log.info("创建动态 OpenAI ChatModel: baseUrl={}, model={}", baseUrl, effectiveModel);
+            String effectiveKey = (apiKey != null && !apiKey.isEmpty()) ? apiKey : "ollama";
 
             OpenAIClient openAiClient = OpenAIOkHttpClient.builder()
                     .baseUrl(baseUrl)
                     .apiKey(effectiveKey)
+                    .timeout(Duration.ofSeconds(30))
                     .build();
 
             OpenAIClientAsync openAiClientAsync = OpenAIOkHttpClientAsync.builder()
                     .baseUrl(baseUrl)
                     .apiKey(effectiveKey)
+                    .timeout(Duration.ofSeconds(30))
                     .build();
 
             OpenAiChatOptions options = OpenAiChatOptions.builder()
                     .model(effectiveModel)
                     .temperature(0.7)
+                    .maxTokens(2048)
                     .build();
 
             return OpenAiChatModel.builder()
@@ -79,5 +109,13 @@ public class DynamicLlmService {
                     .options(options)
                     .build();
         });
+    }
+
+    /**
+     * 判断是否为 Ollama 服务地址
+     * Ollama 默认端口 11434
+     */
+    public boolean isOllamaUrl(String baseUrl) {
+        return baseUrl != null && baseUrl.contains("11434");
     }
 }

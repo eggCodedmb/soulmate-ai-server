@@ -119,6 +119,14 @@ public class ConversationServiceImpl implements ConversationService {
                     .build());
         }
 
+        // 校验 companionId 与会话所属伴侣一致，防止上下文混淆
+        if (!conversation.getCompanionId().equals(request.getCompanionId())) {
+            return Flux.just(ChatResponse.builder()
+                    .error("会话与伴侣不匹配")
+                    .done(true)
+                    .build());
+        }
+
         // 保存用户消息
         Message userMessage = new Message();
         userMessage.setConversationId(conversation.getId());
@@ -203,6 +211,11 @@ public class ConversationServiceImpl implements ConversationService {
     public Message sendMessageSync(Long userId, ChatRequest request) {
         Conversation conversation = conversationMapper.selectById(request.getConversationId());
         if (conversation == null || !conversation.getUserId().equals(userId)) {
+            throw new BizException(ResultCode.CONVERSATION_NOT_FOUND);
+        }
+
+        // 校验 companionId 与会话所属伴侣一致，防止上下文混淆
+        if (!conversation.getCompanionId().equals(request.getCompanionId())) {
             throw new BizException(ResultCode.CONVERSATION_NOT_FOUND);
         }
 
