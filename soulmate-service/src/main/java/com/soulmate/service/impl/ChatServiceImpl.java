@@ -82,7 +82,11 @@ public class ChatServiceImpl implements ChatService {
             ChatClient toolClient = resolveClient(userMessage);
             ChatClient client = dynamicLlmService.resolveChatClient(request, toolClient);
 
+            // 1. 先保存用户消息到上下文
+            promptBuilder.saveContext(conversation.getId(), "user", userMessage, conversation.getContextWindow());
+
             AtomicInteger chunkCount = new AtomicInteger(0);
+            StringBuilder fullContent = new StringBuilder();
 
             return client.prompt()
                     .messages(messages)
@@ -94,17 +98,37 @@ public class ChatServiceImpl implements ChatService {
                         if (response.getResult() != null && response.getResult().getOutput() != null) {
                             content = response.getResult().getOutput().getText();
                         }
+                        
+                        // 某些模型可能会返回 null 或空字符串的 chunk，跳过处理
+                        if (content == null || content.isEmpty()) {
+                            return ChatResponse.builder()
+                                    .conversationId(conversation.getId())
+                                    .content("")
+                                    .done(false)
+                                    .build();
+                        }
+
+                        // 累加完整内容用于保存上下文
+                        fullContent.append(content);
+                        
                         int count = chunkCount.incrementAndGet();
-                        log.info("SSE Chunk #{}: content=[{}]", count,
-                                content != null ? content.replace("\n", "\\n") : "null");
+                        log.debug("SSE Chunk #{}: size={}, content=[{}]", count, content.length(),
+                                content.replace("\n", "\\n"));
+                        
                         return ChatResponse.builder()
                                 .conversationId(conversation.getId())
-                                .content(content != null ? content : "")
+                                .content(content)
                                 .done(false)
                                 .build();
                     })
-                    .doOnComplete(() -> log.info("SSE流完成: userId={}, conversationId={}, totalChunks={}",
-                            userId, conversation.getId(), chunkCount.get()))
+                    .doOnComplete(() -> {
+                        log.info("SSE流完成: userId={}, conversationId={}, totalChunks={}",
+                                userId, conversation.getId(), chunkCount.get());
+                        // 2. 流完成后保存 AI 回复到上下文
+                        if (fullContent.length() > 0) {
+                            promptBuilder.saveContext(conversation.getId(), "assistant", fullContent.toString(), conversation.getContextWindow());
+                        }
+                    })
                     .onErrorResume(e -> {
                         String errorMsg = e instanceof java.util.concurrent.TimeoutException
                                 ? "AI响应超时，请检查模型服务是否正常运行"
@@ -146,13 +170,21 @@ public class ChatServiceImpl implements ChatService {
                     request != null && request.getLlmProviderType() != null ? request.getLlmProviderType() : "system",
                     request != null && request.getLlmModel() != null ? request.getLlmModel() : "default");
 
+            // 1. 保存用户消息
+            promptBuilder.saveContext(conversation.getId(), "user", userMessage, conversation.getContextWindow());
+
             org.springframework.ai.chat.model.ChatResponse response = client.prompt()
                     .messages(messages)
                     .call()
                     .chatResponse();
 
             if (response.getResult() != null && response.getResult().getOutput() != null) {
-                return response.getResult().getOutput().getText();
+                String content = response.getResult().getOutput().getText();
+                // 2. 保存 AI 回复
+                if (content != null) {
+                    promptBuilder.saveContext(conversation.getId(), "assistant", content, conversation.getContextWindow());
+                }
+                return content;
             }
             return "抱歉，我暂时无法回复。";
 

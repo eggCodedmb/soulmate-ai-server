@@ -38,6 +38,7 @@ public class CompanionController {
         companion.setSpeakingStyle(
                 com.soulmate.domain.enums.SpeakingStyle.valueOf(
                         request.getSpeakingStyle() != null ? request.getSpeakingStyle().toUpperCase() : "CASUAL"));
+        companion.setBirthday(request.getBirthday());
         companion.setDescription(request.getDescription());
 
         List<CompanionPersonality> personalities = null;
@@ -89,6 +90,7 @@ public class CompanionController {
             companion.setSpeakingStyle(
                     com.soulmate.domain.enums.SpeakingStyle.valueOf(request.getSpeakingStyle().toUpperCase()));
         }
+        companion.setBirthday(request.getBirthday());
         companion.setDescription(request.getDescription());
 
         // 解析个性标签（null表示不更新，空列表表示清空标签）

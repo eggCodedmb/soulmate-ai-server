@@ -5,6 +5,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
+import java.time.LocalDate;
 import java.util.List;
 
 /**
@@ -29,6 +30,9 @@ public class CreateCompanionRequest {
 
     /** 说话风格 */
     private String speakingStyle = "casual";
+
+    /** 出生日期 */
+    private LocalDate birthday;
 
     /** 背景故事 */
     private String description;

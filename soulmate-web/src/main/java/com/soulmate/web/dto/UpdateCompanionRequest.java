@@ -3,6 +3,7 @@ package com.soulmate.web.dto;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
+import java.time.LocalDate;
 import java.util.List;
 
 /**
@@ -24,6 +25,9 @@ public class UpdateCompanionRequest {
 
     /** 说话风格 */
     private String speakingStyle;
+
+    /** 出生日期 */
+    private LocalDate birthday;
 
     /** 背景故事 */
     private String description;

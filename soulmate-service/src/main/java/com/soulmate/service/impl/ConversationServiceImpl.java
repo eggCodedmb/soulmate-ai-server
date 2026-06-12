@@ -184,15 +184,6 @@ public class ConversationServiceImpl implements ConversationService {
                         aiMessage.setCreateTime(LocalDateTime.now());
                         messageMapper.insert(aiMessage);
 
-                        // 保存assistant回复到Redis上下文
-                        try {
-                            String ctxKey = COMPANION_CONTEXT + conversation.getId();
-                            redisTemplate.opsForList().rightPush(ctxKey, "assistant:" + cleanReply);
-                            redisTemplate.opsForList().trim(ctxKey, -(conversation.getContextWindow() * 2L), -1);
-                        } catch (Exception e) {
-                            log.warn("保存assistant上下文失败: conversationId={}", conversation.getId(), e);
-                        }
-
                         // 更新会话最后消息
                         conversation.setLastMessagePreview(
                                 cleanReply.length() > 100 ? cleanReply.substring(0, 100) + "..." : cleanReply);
@@ -253,15 +244,6 @@ public class ConversationServiceImpl implements ConversationService {
         aiMessage.setReadStatus(0);
         aiMessage.setCreateTime(LocalDateTime.now());
         messageMapper.insert(aiMessage);
-
-        // 保存assistant回复到Redis上下文
-        try {
-            String ctxKey = COMPANION_CONTEXT + conversation.getId();
-            redisTemplate.opsForList().rightPush(ctxKey, "assistant:" + cleanReply);
-            redisTemplate.opsForList().trim(ctxKey, -(conversation.getContextWindow() * 2L), -1);
-        } catch (Exception e) {
-            log.warn("保存assistant上下文失败: conversationId={}", conversation.getId(), e);
-        }
 
         // 更新会话
         conversation.setLastMessagePreview(

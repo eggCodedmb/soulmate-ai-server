@@ -10,6 +10,7 @@ import com.soulmate.domain.enums.RelationshipType;
 import com.soulmate.domain.enums.SpeakingStyle;
 import lombok.Data;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -40,6 +41,9 @@ public class Companion {
 
     /** 说话风格 */
     private SpeakingStyle speakingStyle;
+
+    /** 出生日期 */
+    private LocalDate birthday;
 
     /** 当前头像URL */
     private String avatarUrl;

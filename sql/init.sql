@@ -69,6 +69,7 @@ CREATE TABLE IF NOT EXISTS t_companion (
     relationship_type VARCHAR(32)  NOT NULL,
     description       TEXT,
     speaking_style    VARCHAR(32)  DEFAULT 'casual',
+    birthday          DATE,
     avatar_url        VARCHAR(512),
     theme_color       VARCHAR(16),
     status            SMALLINT     DEFAULT 1,
