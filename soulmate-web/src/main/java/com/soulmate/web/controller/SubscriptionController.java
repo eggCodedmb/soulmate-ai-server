@@ -1,6 +1,7 @@
 package com.soulmate.web.controller;
 
 import com.soulmate.common.response.R;
+import com.soulmate.domain.dto.SubscriptionStatusDTO;
 import com.soulmate.domain.entity.SubscriptionPlan;
 import com.soulmate.domain.entity.UserSubscription;
 import com.soulmate.service.SubscriptionService;
@@ -33,5 +34,13 @@ public class SubscriptionController {
     @GetMapping("/current")
     public R<UserSubscription> getCurrentSubscription(@RequestAttribute("currentUserId") Long userId) {
         return R.ok(subscriptionService.getCurrentSubscription(userId));
+    }
+
+    /**
+     * 获取用户当前额度状态
+     */
+    @GetMapping("/status")
+    public R<SubscriptionStatusDTO> getSubscriptionStatus(@RequestAttribute("currentUserId") Long userId) {
+        return R.ok(subscriptionService.getSubscriptionStatus(userId));
     }
 }

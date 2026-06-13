@@ -186,12 +186,4 @@ public class ChatServiceImpl implements ChatService {
                 .defaultTools(weatherToolService, timeToolService)
                 .build();
     }
-
-    /**
-     * 已弃用：现在统一使用集成所有工具的客户端
-     */
-    @Deprecated
-    private ChatClient resolveClient(String message) {
-        return chatClient;
-    }
 }

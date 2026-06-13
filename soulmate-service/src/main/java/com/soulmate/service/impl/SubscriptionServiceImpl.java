@@ -1,7 +1,7 @@
 package com.soulmate.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.soulmate.common.config.LimitProperties;
+import com.soulmate.domain.dto.SubscriptionStatusDTO;
 import com.soulmate.common.constant.RedisConstants;
 import com.soulmate.common.exception.BizException;
 import com.soulmate.common.response.ResultCode;
@@ -33,7 +33,41 @@ public class SubscriptionServiceImpl implements SubscriptionService {
     private final UserSubscriptionMapper subscriptionMapper;
     private final CompanionMapper companionMapper;
     private final StringRedisTemplate redisTemplate;
-    private final LimitProperties limitProperties;
+
+    @Override
+    public SubscriptionStatusDTO getSubscriptionStatus(Long userId) {
+        // 1. 获取用户套餐
+        UserSubscription subscription = getCurrentSubscription(userId);
+        SubscriptionPlan plan = getUserPlan(userId);
+
+        // 2. 获取今日已用消息数
+        String key = RedisConstants.USER_DAILY_MSG + userId + ":" + LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE);
+        String countStr = redisTemplate.opsForValue().get(key);
+        int todayUsedMessages = countStr == null ? 0 : Integer.parseInt(countStr);
+
+        // 3. 计算剩余消息数
+        int remainingMessages = -1;
+        if (plan.getMaxDailyMessages() != -1) {
+            remainingMessages = Math.max(0, plan.getMaxDailyMessages() - todayUsedMessages);
+        }
+
+        // 4. 获取当前活跃伴侣数
+        long currentCompanions = companionMapper.selectCount(
+                new LambdaQueryWrapper<Companion>()
+                        .eq(Companion::getUserId, userId)
+                        .eq(Companion::getStatus, 1));
+
+        return SubscriptionStatusDTO.builder()
+                .planCode(plan.getPlanCode())
+                .planName(plan.getPlanName())
+                .maxDailyMessages(plan.getMaxDailyMessages())
+                .todayUsedMessages(todayUsedMessages)
+                .remainingMessages(remainingMessages)
+                .maxCompanions(plan.getMaxCompanions())
+                .currentCompanions((int) currentCompanions)
+                .expireTime(subscription != null ? subscription.getEndTime() : null)
+                .build();
+    }
 
     @Override
     public List<SubscriptionPlan> getAllPlans() {

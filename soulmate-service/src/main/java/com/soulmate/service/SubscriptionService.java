@@ -1,5 +1,6 @@
 package com.soulmate.service;
 
+import com.soulmate.domain.dto.SubscriptionStatusDTO;
 import com.soulmate.domain.entity.SubscriptionPlan;
 import com.soulmate.domain.entity.UserSubscription;
 
@@ -9,6 +10,11 @@ import java.util.List;
  * 订阅服务
  */
 public interface SubscriptionService {
+
+    /**
+     * 获取用户当前额度状态
+     */
+    SubscriptionStatusDTO getSubscriptionStatus(Long userId);
 
     /**
      * 获取所有套餐
