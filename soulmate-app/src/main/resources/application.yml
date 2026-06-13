@@ -67,10 +67,9 @@ spring:
       api-key: ${MIMO_API_KEY}
       base-url: ${MIMO_BASE_URL}
       chat:
-        options:
-          model: mimo-v2.5-pro
-          temperature: 0.7
-          max-tokens: 2048
+        model: mimo-v2.5-pro
+        max-tokens: 2048
+        temperature: 0.7
     embedding:
       transformer:
         onnx:
@@ -90,8 +89,8 @@ spring:
 
 # MyBatis-Plus
 mybatis-plus:
-  type-enums-package: com.soulmate.domain.enums
   configuration:
+    default-enum-type-handler: com.baomidou.mybatisplus.core.handlers.MybatisEnumTypeHandler
     map-underscore-to-camel-case: true
     log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
   global-config:
@@ -151,7 +150,7 @@ management:
 # 日志
 logging:
   level:
-    com.soulmate: DEBUG
-    org.springframework.ai: DEBUG
-    org.springframework.web.client: DEBUG
-    org.apache.hc.client5: INFO
+    "[com.soulmate]": DEBUG
+    "[org.springframework.ai]": DEBUG
+    "[org.springframework.web.client]": DEBUG
+    "[org.apache.hc.client5]": INFO
