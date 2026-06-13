@@ -1,13 +1,11 @@
 package com.soulmate.service.impl;
 
 import com.soulmate.domain.dto.ChatRequest;
-import com.soulmate.domain.dto.ChatResponse;
 import com.openai.client.OpenAIClient;
 import com.openai.client.OpenAIClientAsync;
 import com.openai.client.okhttp.OpenAIOkHttpClient;
 import com.openai.client.okhttp.OpenAIOkHttpClientAsync;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.ollama.OllamaChatModel;
 import org.springframework.ai.ollama.api.OllamaApi;
@@ -21,7 +19,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 动态 LLM 模型解析服务
- * 根据客户端传入的 LLM 配置，动态构建 ChatModel / ChatClient
+ * 根据客户端传入的 LLM 配置，动态构建 ChatModel
  */
 @Slf4j
 @Service
@@ -30,11 +28,11 @@ public class DynamicLlmService {
     private final ConcurrentHashMap<String, ChatModel> modelCache = new ConcurrentHashMap<>();
 
     /**
-     * 根据请求解析 ChatClient
+     * 根据请求解析 ChatModel
      * - providerType 为 null 或 "system" → 返回 fallback（系统默认）
      * - providerType 为 "openai" → 动态构建并缓存
      */
-    public ChatClient resolveChatClient(ChatRequest request, ChatClient fallback) {
+    public ChatModel resolveChatModel(ChatRequest request, ChatModel fallback) {
         if (request == null
                 || request.getLlmProviderType() == null
                 || "system".equals(request.getLlmProviderType())) {
@@ -47,8 +45,7 @@ public class DynamicLlmService {
                 log.warn("llmProviderType=openai 但 llmBaseUrl 为空，回退到系统默认");
                 return fallback;
             }
-            ChatModel model = getOrCreateModel(baseUrl, request.getLlmApiKey(), request.getLlmModel());
-            return ChatClient.builder(model).build();
+            return getOrCreateModel(baseUrl, request.getLlmApiKey(), request.getLlmModel());
         }
 
         log.warn("未知的 llmProviderType: {}，回退到系统默认", request.getLlmProviderType());

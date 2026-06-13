@@ -1,6 +1,5 @@
 package com.soulmate.service.impl;
 
-import com.soulmate.service.impl.PromptBuilder;
 import com.soulmate.domain.entity.Companion;
 import com.soulmate.domain.entity.Conversation;
 import com.soulmate.service.ChatService;
@@ -13,12 +12,12 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.Message;
+import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 
 import java.time.Duration;
 import java.util.List;
-import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -31,39 +30,21 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class ChatServiceImpl implements ChatService {
 
     private final ChatClient.Builder chatClientBuilder;
+    private final ChatModel chatModel;
     private final PromptBuilder promptBuilder;
     private final WeatherToolService weatherToolService;
     private final TimeToolService timeToolService;
     private final DynamicLlmService dynamicLlmService;
 
-    /** 普通聊天客户端（不带工具） */
+    /** 核心聊天客户端（集成所有工具） */
     private ChatClient chatClient;
-    /** 带天气工具的聊天客户端 */
-    private ChatClient weatherChatClient;
-    /** 带时间工具的聊天客户端 */
-    private ChatClient timeChatClient;
-
-    /** 天气相关关键词，用户消息包含其中任意一个才会注册天气工具 */
-    private static final Set<String> WEATHER_KEYWORDS = Set.of(
-            "天气", "气温", "温度", "下雨", "下雪", "晴天", "阴天", "多云",
-            "台风", "暴雨", "寒潮", "降温", "升温", "湿度", "风力",
-            "weather", "temperature", "rain", "snow"
-    );
-
-    /** 时间相关关键词，用户消息包含其中任意一个才会注册时间工具 */
-    private static final Set<String> TIME_KEYWORDS = Set.of(
-            "几点", "时间", "日期", "今天", "星期", "几号",
-            "what time", "what date", "time", "today"
-    );
 
     @PostConstruct
     public void init() {
-        chatClient = chatClientBuilder.build();
-        weatherChatClient = chatClientBuilder.build().mutate()
-                .defaultTools(weatherToolService)
-                .build();
-        timeChatClient = chatClientBuilder.build().mutate()
-                .defaultTools(timeToolService)
+        // 建议：将所有常用工具注册到同一个客户端，让 LLM 自行判断调用时机
+        // 这样可以避免关键词匹配不准确导致工具无法调用的问题
+        chatClient = chatClientBuilder
+                .defaultTools(weatherToolService, timeToolService)
                 .build();
     }
 
@@ -78,9 +59,8 @@ public class ChatServiceImpl implements ChatService {
                     request != null && request.getLlmProviderType() != null ? request.getLlmProviderType() : "system",
                     request != null && request.getLlmModel() != null ? request.getLlmModel() : "default");
 
-            // 使用 DynamicLlmService 解析 ChatClient（已集成原生 Ollama 支持）
-            ChatClient toolClient = resolveClient(userMessage);
-            ChatClient client = dynamicLlmService.resolveChatClient(request, toolClient);
+            // 解析合适的 ChatClient
+            ChatClient client = resolveDynamicClient(request);
 
             // 1. 先保存用户消息到上下文
             promptBuilder.saveContext(conversation.getId(), "user", userMessage, conversation.getContextWindow());
@@ -163,8 +143,7 @@ public class ChatServiceImpl implements ChatService {
                            ChatRequest request) {
         try {
             List<Message> messages = promptBuilder.buildMessages(userId, conversation, companion, userMessage);
-            ChatClient toolClient = resolveClient(userMessage);
-            ChatClient client = dynamicLlmService.resolveChatClient(request, toolClient);
+            ChatClient client = resolveDynamicClient(request);
             log.info("聊天请求: userId={}, llmType={}, model={}",
                     userId,
                     request != null && request.getLlmProviderType() != null ? request.getLlmProviderType() : "system",
@@ -195,19 +174,24 @@ public class ChatServiceImpl implements ChatService {
     }
 
     /**
-     * 根据用户消息选择合适的 ChatClient
+     * 根据请求动态解析 ChatClient
      */
-    private ChatClient resolveClient(String message) {
-        if (message == null) {
+    private ChatClient resolveDynamicClient(ChatRequest request) {
+        ChatModel model = dynamicLlmService.resolveChatModel(request, chatModel);
+        if (model == chatModel) {
             return chatClient;
         }
-        String lower = message.toLowerCase();
-        if (WEATHER_KEYWORDS.stream().anyMatch(lower::contains)) {
-            return weatherChatClient;
-        }
-        if (TIME_KEYWORDS.stream().anyMatch(lower::contains)) {
-            return timeChatClient;
-        }
+        // 如果是动态模型，创建一个集成工具的新客户端
+        return ChatClient.builder(model)
+                .defaultTools(weatherToolService, timeToolService)
+                .build();
+    }
+
+    /**
+     * 已弃用：现在统一使用集成所有工具的客户端
+     */
+    @Deprecated
+    private ChatClient resolveClient(String message) {
         return chatClient;
     }
 }

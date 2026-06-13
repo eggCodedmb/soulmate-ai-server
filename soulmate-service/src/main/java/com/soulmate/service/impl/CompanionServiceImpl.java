@@ -4,12 +4,8 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.soulmate.common.exception.BizException;
 import com.soulmate.common.response.ResultCode;
-import com.soulmate.domain.entity.Companion;
-import com.soulmate.domain.entity.CompanionPersonality;
-import com.soulmate.domain.entity.CompanionVoice;
-import com.soulmate.mapper.CompanionMapper;
-import com.soulmate.mapper.CompanionPersonalityMapper;
-import com.soulmate.mapper.CompanionVoiceMapper;
+import com.soulmate.domain.entity.*;
+import com.soulmate.mapper.*;
 import com.soulmate.service.CompanionService;
 import com.soulmate.service.SubscriptionService;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +24,14 @@ public class CompanionServiceImpl extends ServiceImpl<CompanionMapper, Companion
 
     private final CompanionPersonalityMapper personalityMapper;
     private final CompanionVoiceMapper voiceMapper;
+    private final CompanionAvatarMapper avatarMapper;
+    private final CompanionReminderMapper reminderMapper;
+    private final ConversationMapper conversationMapper;
+    private final MessageMapper messageMapper;
+    private final MemoryMapper memoryMapper;
+    private final MemoryTagMapper memoryTagMapper;
+    private final NotificationMapper notificationMapper;
+    private final ScheduleReminderMapper scheduleReminderMapper;
     private final SubscriptionService subscriptionService;
 
     @Override
@@ -110,11 +114,67 @@ public class CompanionServiceImpl extends ServiceImpl<CompanionMapper, Companion
     }
 
     @Override
+    @Transactional
     public void deleteCompanion(Long userId, Long companionId) {
         Companion existing = getCompanionDetail(userId, companionId);
+        
+        // 1. 逻辑删除伴侣主表记录
         existing.setStatus(0); // 归档
         existing.setUpdateTime(LocalDateTime.now());
         updateById(existing);
+        removeById(companionId); // MyBatis-Plus 会根据配置执行逻辑删除 (deleted=1)
+
+        // 2. 级联删除相关配置
+        // 性格标签
+        personalityMapper.delete(new LambdaQueryWrapper<CompanionPersonality>()
+                .eq(CompanionPersonality::getCompanionId, companionId));
+        
+        // 语音配置
+        voiceMapper.delete(new LambdaQueryWrapper<CompanionVoice>()
+                .eq(CompanionVoice::getCompanionId, companionId));
+        
+        // 头像配置
+        avatarMapper.delete(new LambdaQueryWrapper<CompanionAvatar>()
+                .eq(CompanionAvatar::getCompanionId, companionId));
+
+        // 伴侣定时提醒
+        reminderMapper.delete(new LambdaQueryWrapper<CompanionReminder>()
+                .eq(CompanionReminder::getCompanionId, companionId));
+
+        // 3. 级联删除对话与消息
+        List<Conversation> conversations = conversationMapper.selectList(
+                new LambdaQueryWrapper<Conversation>()
+                        .eq(Conversation::getCompanionId, companionId));
+        
+        for (Conversation conv : conversations) {
+            // 删除消息
+            messageMapper.delete(new LambdaQueryWrapper<Message>()
+                    .eq(Message::getConversationId, conv.getId()));
+            // 删除会话
+            conversationMapper.deleteById(conv.getId());
+        }
+
+        // 4. 级联删除记忆
+        List<Memory> memories = memoryMapper.selectList(
+                new LambdaQueryWrapper<Memory>()
+                        .eq(Memory::getCompanionId, companionId));
+        
+        for (Memory memory : memories) {
+            // 删除记忆标签
+            memoryTagMapper.delete(new LambdaQueryWrapper<MemoryTag>()
+                    .eq(MemoryTag::getMemoryId, memory.getId()));
+            // 删除记忆
+            memoryMapper.deleteById(memory.getId());
+        }
+
+        // 5. 级联删除通知与日程
+        notificationMapper.delete(new LambdaQueryWrapper<Notification>()
+                .eq(Notification::getCompanionId, companionId));
+        
+        scheduleReminderMapper.delete(new LambdaQueryWrapper<ScheduleReminder>()
+                .eq(ScheduleReminder::getCompanionId, companionId));
+
+        log.info("伴侣及其关联数据已成功级联删除: companionId={}, userId={}", companionId, userId);
     }
 
     @Override
