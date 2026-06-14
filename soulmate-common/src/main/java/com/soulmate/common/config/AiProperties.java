@@ -15,6 +15,9 @@ public class AiProperties {
     /** 默认模型编码 */
     private String defaultModel = "mimo-v2.5-pro";
 
+    /** 通话模型编码 */
+    private String callModel = "mimo-v2.5-flash";
+
     /** 系统提示词模板路径 */
     private String systemPromptTemplate = "classpath:prompts/system-prompt.st";
 

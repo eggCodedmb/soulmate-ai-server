@@ -35,6 +35,11 @@ public interface ConversationService {
     Flux<ChatResponse> sendMessage(Long userId, ChatRequest request);
 
     /**
+     * 发送开场白指令并获取AI回复（SSE流式，不保存用户发送的 [GREETING] 消息）
+     */
+    Flux<ChatResponse> sendGreeting(Long userId, ChatRequest request);
+
+    /**
      * 获取普通（非流式）AI回复
      */
     Message sendMessageSync(Long userId, ChatRequest request);

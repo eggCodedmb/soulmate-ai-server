@@ -53,7 +53,8 @@ public class ChatServiceImpl implements ChatService {
                                           Companion companion, String userMessage,
                                           ChatRequest request) {
         try {
-            List<Message> messages = promptBuilder.buildMessages(userId, conversation, companion, userMessage);
+            boolean isVoiceCall = request != null && "voice_call".equalsIgnoreCase(request.getSceneMode());
+            List<Message> messages = promptBuilder.buildMessages(userId, conversation, companion, userMessage, isVoiceCall);
             log.info("聊天请求: userId={}, llmType={}, model={}",
                     userId,
                     request != null && request.getLlmProviderType() != null ? request.getLlmProviderType() : "system",
@@ -62,8 +63,10 @@ public class ChatServiceImpl implements ChatService {
             // 解析合适的 ChatClient
             ChatClient client = resolveDynamicClient(request);
 
-            // 1. 先保存用户消息到上下文
-            promptBuilder.saveContext(conversation.getId(), "user", userMessage, conversation.getContextWindow());
+            // 1. 先保存用户消息到上下文（如果是开场白，跳过用户指令的保存，只保存稍后AI生成的开场白）
+            if (!"[GREETING]".equals(userMessage)) {
+                promptBuilder.saveContext(conversation.getId(), "user", userMessage, conversation.getContextWindow());
+            }
 
             AtomicInteger chunkCount = new AtomicInteger(0);
             StringBuilder fullContent = new StringBuilder();
@@ -110,9 +113,13 @@ public class ChatServiceImpl implements ChatService {
                         }
                     })
                     .onErrorResume(e -> {
-                        String errorMsg = e instanceof java.util.concurrent.TimeoutException
-                                ? "AI响应超时，请检查模型服务是否正常运行"
-                                : "AI服务暂时不可用，请稍后再试";
+                        String errorMsg = "AI服务暂时不可用，请稍后再试";
+                        if (e instanceof java.util.concurrent.TimeoutException) {
+                            errorMsg = "AI响应超时，请检查模型服务是否正常运行";
+                        } else if (e.getMessage() != null && e.getMessage().contains("quota exhausted")) {
+                            errorMsg = "AI额度已用尽，请检查账户余额或更换API Key";
+                        }
+                        
                         log.error("AI流式响应异常: userId={}, conversationId={}, errorType={}, msg={}, chunksBeforeError={}",
                                 userId, conversation.getId(), e.getClass().getSimpleName(), e.getMessage(), chunkCount.get());
                         return Flux.just(ChatResponse.builder()
@@ -142,7 +149,8 @@ public class ChatServiceImpl implements ChatService {
                            Companion companion, String userMessage,
                            ChatRequest request) {
         try {
-            List<Message> messages = promptBuilder.buildMessages(userId, conversation, companion, userMessage);
+            boolean isVoiceCall = request != null && "voice_call".equalsIgnoreCase(request.getSceneMode());
+            List<Message> messages = promptBuilder.buildMessages(userId, conversation, companion, userMessage, isVoiceCall);
             ChatClient client = resolveDynamicClient(request);
             log.info("聊天请求: userId={}, llmType={}, model={}",
                     userId,
@@ -169,6 +177,9 @@ public class ChatServiceImpl implements ChatService {
 
         } catch (Exception e) {
             log.error("AI同步聊天异常: userId={}, conversationId={}", userId, conversation.getId(), e);
+            if (e.getMessage() != null && e.getMessage().contains("quota exhausted")) {
+                return "抱歉，AI额度已用尽，请检查账户余额或更换API Key。";
+            }
             return "抱歉，AI服务暂时不可用，请稍后再试。";
         }
     }

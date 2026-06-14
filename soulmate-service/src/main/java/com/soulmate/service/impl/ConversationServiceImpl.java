@@ -199,6 +199,71 @@ public class ConversationServiceImpl implements ConversationService {
 
     @Override
     @Transactional
+    public Flux<ChatResponse> sendGreeting(Long userId, ChatRequest request) {
+        Conversation conversation = conversationMapper.selectById(request.getConversationId());
+        if (conversation == null || !conversation.getUserId().equals(userId)) {
+            return Flux.just(ChatResponse.builder()
+                    .error("会话不存在")
+                    .done(true)
+                    .build());
+        }
+
+        if (!conversation.getCompanionId().equals(request.getCompanionId())) {
+            return Flux.just(ChatResponse.builder()
+                    .error("会话与伴侣不匹配")
+                    .done(true)
+                    .build());
+        }
+
+        // 开场白不计入用户的日常额度，也不保存用户指令本身，直接调用AI流式获取招呼语
+        Companion companion = companionMapper.selectById(request.getCompanionId());
+        StringBuilder fullContent = new StringBuilder();
+
+        return chatService.streamChat(userId, conversation, companion, "[GREETING]", request)
+                .doOnNext(res -> {
+                    if (res.getContent() != null) {
+                        fullContent.append(res.getContent());
+                    }
+                })
+                .doOnComplete(() -> {
+                    String aiReply = fullContent.toString();
+                    if (!aiReply.isBlank()) {
+                        // 1. 解析并自动创建定时提醒
+                        companionReminderService.parseAndCreateReminder(userId, companion.getId(), aiReply);
+
+                        // 2. 清洗过滤控制指令标签和 tool call 残流
+                        String cleanReply = aiReply
+                                .replaceAll("<command.*?>.*?</command>", "")
+                                .replaceAll("(?s)<tool_call>.*?</tool_call>", "")
+                                .replaceAll("(?s)<function=.*?</function>", "")
+                                .replaceAll("(?s)<query [^>]*>.*?</query>", "")
+                                .trim();
+
+                        // 保存AI回复消息到数据库
+                        Message aiMessage = new Message();
+                        aiMessage.setConversationId(conversation.getId());
+                        aiMessage.setSenderType(SenderType.COMPANION);
+                        aiMessage.setContent(cleanReply);
+                        aiMessage.setContentType(ContentType.TEXT);
+                        aiMessage.setReadStatus(0);
+                        aiMessage.setCreateTime(LocalDateTime.now());
+                        messageMapper.insert(aiMessage);
+
+                        // 更新会话最后消息
+                        conversation.setLastMessagePreview(
+                                cleanReply.length() > 100 ? cleanReply.substring(0, 100) + "..." : cleanReply);
+                        conversation.setLastMessageTime(LocalDateTime.now());
+                        conversationMapper.updateById(conversation);
+
+                        // 异步提取记忆
+                        memoryService.extractMemories(userId, companion.getId(), conversation.getId());
+                        log.info("AI开场白回复并保存成功: conversationId={}", conversation.getId());
+                    }
+                });
+    }
+
+    @Override
+    @Transactional
     public Message sendMessageSync(Long userId, ChatRequest request) {
         Conversation conversation = conversationMapper.selectById(request.getConversationId());
         if (conversation == null || !conversation.getUserId().equals(userId)) {
