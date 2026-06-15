@@ -43,4 +43,10 @@ public interface ConversationService {
      * 获取普通（非流式）AI回复
      */
     Message sendMessageSync(Long userId, ChatRequest request);
+
+    /**
+     * 删除单条消息
+     */
+    void deleteMessage(Long userId, Long messageId);
 }
+

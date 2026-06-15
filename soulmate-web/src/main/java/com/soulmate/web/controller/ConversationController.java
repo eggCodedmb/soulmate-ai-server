@@ -74,4 +74,15 @@ public class ConversationController {
                                    @Valid @RequestBody ChatRequest request) {
         return R.ok(conversationService.sendMessageSync(userId, request));
     }
+
+    /**
+     * 删除单条消息
+     */
+    @DeleteMapping("/message/{id}")
+    public R<Void> deleteMessage(@RequestAttribute("currentUserId") Long userId,
+                                  @PathVariable Long id) {
+        conversationService.deleteMessage(userId, id);
+        return R.ok();
+    }
 }
+

@@ -345,4 +345,42 @@ public class ConversationServiceImpl implements ConversationService {
 
         return aiMessage;
     }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void deleteMessage(Long userId, Long messageId) {
+        Message message = messageMapper.selectById(messageId);
+        if (message == null) {
+            return;
+        }
+        // 校验权限：该消息对应的对话必须属于当前用户
+        Conversation conversation = conversationMapper.selectById(message.getConversationId());
+        if (conversation == null || !conversation.getUserId().equals(userId)) {
+            throw new BizException(ResultCode.FORBIDDEN);
+        }
+
+        // 逻辑删除消息 (由 MyBatis-Plus 逻辑删除处理，会将 deleted 字段更新为 1)
+        messageMapper.deleteById(messageId);
+
+        // 更新会话的最后一条消息预览和时间
+        List<Message> latestMessages = messageMapper.selectList(new LambdaQueryWrapper<Message>()
+                .eq(Message::getConversationId, conversation.getId())
+                .eq(Message::getDeleted, 0)
+                .orderByDesc(Message::getCreateTime)
+                .last("limit 1"));
+
+        if (!latestMessages.isEmpty()) {
+            Message latest = latestMessages.get(0);
+            String preview = latest.getContent();
+            conversation.setLastMessagePreview(
+                    preview.length() > 100 ? preview.substring(0, 100) + "..." : preview);
+            conversation.setLastMessageTime(latest.getCreateTime());
+        } else {
+            conversation.setLastMessagePreview("");
+            // 如果对话中已经没有消息，最后一条消息时间恢复为对话的创建时间
+            conversation.setLastMessageTime(conversation.getCreateTime());
+        }
+        conversationMapper.updateById(conversation);
+    }
 }
+
