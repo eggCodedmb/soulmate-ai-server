@@ -92,6 +92,7 @@ public class VectorStoreConfig {
                 log.info("Milvus 集合 {} 已存在，正在加载到内存", collectionName);
                 client.loadCollection(LoadCollectionParam.newBuilder()
                         .withCollectionName(collectionName)
+                        .withSyncLoad(false) // 禁用同步加载，防止 SDK 内部 showCollections 检查时由于 percentage 数量不匹配抛出 IllegalResponseException
                         .build());
                 return;
             }
@@ -149,6 +150,7 @@ public class VectorStoreConfig {
             // 6. 加载集合到内存 (搜索和插入前必须 load)
             client.loadCollection(LoadCollectionParam.newBuilder()
                     .withCollectionName(collectionName)
+                    .withSyncLoad(false) // 禁用同步加载，防止 SDK 内部 showCollections 检查时由于 percentage 数量不匹配抛出 IllegalResponseException
                     .build());
             
             log.info("Milvus 集合与索引创建并加载成功");

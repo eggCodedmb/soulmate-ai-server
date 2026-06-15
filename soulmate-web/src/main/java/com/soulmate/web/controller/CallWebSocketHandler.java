@@ -7,6 +7,10 @@ import com.soulmate.common.util.JwtUtil;
 import com.soulmate.domain.dto.ChatRequest;
 import com.soulmate.domain.dto.ChatResponse;
 import com.soulmate.service.ConversationService;
+import com.soulmate.service.CompanionService;
+import com.soulmate.ai.asr.AsrService;
+import com.soulmate.ai.tts.TtsService;
+import com.soulmate.domain.entity.CompanionVoice;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,11 +21,19 @@ import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import java.io.IOException;
 import java.net.URI;
 import java.util.Map;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Base64;
+import java.util.HashMap;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Pattern;
+import java.util.regex.Matcher;
 
 /**
  * AI 通话 WebSocket 消息处理器 (Raw WebSocket 版本)
@@ -33,6 +45,9 @@ import java.util.concurrent.ConcurrentHashMap;
 public class CallWebSocketHandler extends TextWebSocketHandler {
 
     private final ConversationService conversationService;
+    private final CompanionService companionService;
+    private final AsrService asrService;
+    private final TtsService ttsService;
     private final JwtProperties jwtProperties;
     private final ObjectMapper objectMapper;
     private final AiProperties aiProperties;
@@ -101,9 +116,20 @@ public class CallWebSocketHandler extends TextWebSocketHandler {
 
     private void handleSpeak(WebSocketSession session, Long userId, CallWebSocketMessage msg) {
         Long companionId = msg.getCompanionId();
-        if (companionId == null || msg.getContent() == null) {
-            log.warn("AI通话 speak 请求参数缺失 companionId 或 content");
+        if (companionId == null) {
+            log.warn("AI通话 speak 请求参数缺失 companionId");
             return;
+        }
+
+        // 获取伴侣音色配置
+        String voiceId = "mimo_default";
+        try {
+            CompanionVoice companionVoice = companionService.getCompanionVoice(companionId);
+            if (companionVoice != null && companionVoice.getVoiceId() != null) {
+                voiceId = companionVoice.getVoiceId();
+            }
+        } catch (Exception e) {
+            log.error("获取伴侣声音配置失败: companionId={}", companionId, e);
         }
 
         // 1. 获取或创建 conversationId
@@ -125,42 +151,95 @@ public class CallWebSocketHandler extends TextWebSocketHandler {
         // 2. 如果该会话已有正在输出的流，先清理掉（打断）
         cancelSubscription(conversationId);
 
+        // 3. 处理 ASR（如果上传了音频数据）
+        String content = msg.getContent();
+        if (msg.getAudio() != null && !msg.getAudio().isEmpty()) {
+            try {
+                byte[] audioBytes = Base64.getDecoder().decode(msg.getAudio());
+                String transcribed = asrService.transcribe(audioBytes, "voice.wav");
+                if (transcribed == null || transcribed.isBlank()) {
+                    log.warn("ASR 识别结果为空，忽略并通知客户端重听");
+                    if (session.isOpen()) {
+                        Map<String, Object> respMap = Map.of(
+                                "action", "speak",
+                                "conversationId", conversationId,
+                                "done", true
+                        );
+                        session.sendMessage(new TextMessage(objectMapper.writeValueAsString(respMap)));
+                    }
+                    return;
+                }
+                content = transcribed;
+                log.info("ASR 识别成功: {}", content);
+            } catch (Exception e) {
+                log.error("ASR 处理失败", e);
+                return;
+            }
+        }
+
+        if (content == null || content.isEmpty()) {
+            log.warn("AI通话 content 参数缺失且无音频数据");
+            return;
+        }
+
         ChatRequest chatRequest = new ChatRequest();
         chatRequest.setConversationId(conversationId);
         chatRequest.setCompanionId(companionId);
-        chatRequest.setContent(msg.getContent());
+        chatRequest.setContent(content);
         chatRequest.setContentType("text");
         chatRequest.setLlmModel(aiProperties.getCallModel());
         chatRequest.setSceneMode("voice_call");
 
         // 4. 订阅流式回复 (开场白指令时走专门的 sendGreeting，避免数据库记录该指令)
-        Flux<ChatResponse> responseFlux = "[GREETING]".equals(msg.getContent())
+        Flux<ChatResponse> responseFlux = "[GREETING]".equals(content)
                 ? conversationService.sendGreeting(userId, chatRequest)
                 : conversationService.sendMessage(userId, chatRequest);
         final Long finalConversationId = conversationId;
+        final String finalVoiceId = voiceId;
 
-        Disposable subscription = responseFlux.subscribe(
-                chatResponse -> {
+        SentenceSplitter splitter = new SentenceSplitter();
+        
+        Flux<String> sentenceFlux = responseFlux
+                .publishOn(Schedulers.boundedElastic())
+                .flatMap(chatResponse -> {
+                    if (chatResponse.getError() != null) {
+                        return Flux.error(new RuntimeException(chatResponse.getError()));
+                    }
+                    List<String> sentences = splitter.feed(chatResponse.getContent() != null ? chatResponse.getContent() : "");
+                    return Flux.fromIterable(sentences);
+                });
+
+        sentenceFlux = sentenceFlux.concatWith(Mono.defer(() -> {
+            String remaining = splitter.getRemaining();
+            if (!remaining.isEmpty()) {
+                return Mono.just(remaining);
+            }
+            return Mono.empty();
+        }));
+
+        Disposable subscription = sentenceFlux
+                .concatMap(sentence -> Mono.fromCallable(() -> {
                     try {
                         if (session.isOpen()) {
-                            java.util.HashMap<String, Object> respMap = new java.util.HashMap<>();
-                            respMap.put("action", "speak");
-                            respMap.put("conversationId", finalConversationId);
-                            respMap.put("messageId", chatResponse.getMessageId() != null ? chatResponse.getMessageId() : 0L);
-                            respMap.put("content", chatResponse.getContent() != null ? chatResponse.getContent() : "");
-                            respMap.put("done", chatResponse.isDone());
-                            
-                            if (chatResponse.getError() != null) {
-                                respMap.put("error", chatResponse.getError());
+                            log.info("Generating TTS for sentence: {}", sentence);
+                            byte[] audioBytes = ttsService.generateTts(sentence, finalVoiceId);
+                            if (audioBytes != null && audioBytes.length > 0) {
+                                String base64Audio = Base64.getEncoder().encodeToString(audioBytes);
+                                Map<String, Object> respMap = new HashMap<>();
+                                respMap.put("action", "speak");
+                                respMap.put("conversationId", finalConversationId);
+                                respMap.put("content", sentence);
+                                respMap.put("audio", base64Audio);
+                                respMap.put("done", false);
+                                session.sendMessage(new TextMessage(objectMapper.writeValueAsString(respMap)));
                             }
-                            
-                            session.sendMessage(new TextMessage(objectMapper.writeValueAsString(respMap)));
                         }
-                    } catch (IOException e) {
-                        log.error("推送 AI 语音流消息异常: conversationId={}", finalConversationId, e);
+                    } catch (Exception e) {
+                        log.error("Failed to generate/send TTS for sentence: {}", sentence, e);
                     }
-                },
-                error -> {
+                    return sentence;
+                }).subscribeOn(Schedulers.boundedElastic()))
+                .doOnError(error -> {
                     log.error("AI通话流生成异常: conversationId={}", finalConversationId, error);
                     try {
                         if (session.isOpen()) {
@@ -176,12 +255,23 @@ public class CallWebSocketHandler extends TextWebSocketHandler {
                         log.error("推送异常消息失败", e);
                     }
                     activeSubscriptions.remove(finalConversationId);
-                },
-                () -> {
+                })
+                .doOnComplete(() -> {
                     log.info("AI通话流推送完成: conversationId={}", finalConversationId);
+                    try {
+                        if (session.isOpen()) {
+                            Map<String, Object> respMap = new HashMap<>();
+                            respMap.put("action", "speak");
+                            respMap.put("conversationId", finalConversationId);
+                            respMap.put("done", true);
+                            session.sendMessage(new TextMessage(objectMapper.writeValueAsString(respMap)));
+                        }
+                    } catch (Exception e) {
+                        log.error("Failed to send final done message", e);
+                    }
                     activeSubscriptions.remove(finalConversationId);
-                }
-        );
+                })
+                .subscribe();
 
         // 5. 记录当前活跃订阅
         activeSubscriptions.put(conversationId, subscription);
@@ -248,5 +338,42 @@ public class CallWebSocketHandler extends TextWebSocketHandler {
         private Long companionId;
         private Long conversationId;
         private String content;
+        private String audio;
+    }
+
+    private static class SentenceSplitter {
+        private final StringBuilder buffer = new StringBuilder();
+        private static final Pattern PUNCTUATION = Pattern.compile("[。！？\\.\\?!;\\n]");
+
+        public List<String> feed(String token) {
+            List<String> sentences = new ArrayList<>();
+            buffer.append(token);
+            String text = buffer.toString();
+            
+            Matcher matcher = PUNCTUATION.matcher(text);
+            int lastMatchEnd = 0;
+            while (matcher.find()) {
+                int end = matcher.end();
+                String sentence = text.substring(lastMatchEnd, end).trim();
+                if (!sentence.isEmpty()) {
+                    sentences.add(sentence);
+                }
+                lastMatchEnd = end;
+            }
+            
+            if (lastMatchEnd > 0) {
+                buffer.setLength(0);
+                if (lastMatchEnd < text.length()) {
+                    buffer.append(text.substring(lastMatchEnd));
+                }
+            }
+            return sentences;
+        }
+
+        public String getRemaining() {
+            String remaining = buffer.toString().trim();
+            buffer.setLength(0);
+            return remaining;
+        }
     }
 }
