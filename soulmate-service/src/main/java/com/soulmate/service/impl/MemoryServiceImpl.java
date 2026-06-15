@@ -42,6 +42,10 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import io.milvus.client.MilvusServiceClient;
+import io.milvus.param.collection.DropCollectionParam;
+import org.springframework.beans.factory.annotation.Value;
+import com.soulmate.service.config.VectorStoreConfig;
 
 /**
  * 记忆服务实现
@@ -59,6 +63,15 @@ public class MemoryServiceImpl implements MemoryService {
     private final ChatClient.Builder chatClientBuilder;
     private final ObjectMapper objectMapper;
     private final VectorStore vectorStore;
+
+    @Autowired(required = false)
+    private MilvusServiceClient milvusClient;
+
+    @Autowired(required = false)
+    private VectorStoreConfig vectorStoreConfig;
+
+    @Value("${spring.ai.vectorstore.milvus.collection-name:memory_vectors}")
+    private String collectionName;
 
     public MemoryServiceImpl(MemoryMapper memoryMapper, MemoryTagMapper memoryTagMapper,
                              MessageMapper messageMapper, ConversationMapper conversationMapper,
@@ -271,12 +284,29 @@ public class MemoryServiceImpl implements MemoryService {
                 return;
             }
 
-            // 清理 JSON (有些 LLM 会返回 markdown 块)
+            // 清理 JSON (有些 LLM 会返回带有前导解释文字或 markdown 块的文本)
             String json = response.trim();
-            if (json.startsWith("```json")) {
-                json = json.substring(7, json.lastIndexOf("```")).trim();
-            } else if (json.startsWith("```")) {
-                json = json.substring(3, json.lastIndexOf("```")).trim();
+            int codeBlockStart = json.indexOf("```json");
+            if (codeBlockStart != -1) {
+                int codeBlockEnd = json.indexOf("```", codeBlockStart + 7);
+                if (codeBlockEnd != -1) {
+                    json = json.substring(codeBlockStart + 7, codeBlockEnd).trim();
+                }
+            } else {
+                int codeBlockStartGeneric = json.indexOf("```");
+                if (codeBlockStartGeneric != -1) {
+                    int codeBlockEndGeneric = json.indexOf("```", codeBlockStartGeneric + 3);
+                    if (codeBlockEndGeneric != -1) {
+                        json = json.substring(codeBlockStartGeneric + 3, codeBlockEndGeneric).trim();
+                    }
+                }
+            }
+            
+            // 确保只提取 JSON 数组 [ ... ] 部分
+            int arrayStart = json.indexOf("[");
+            int arrayEnd = json.lastIndexOf("]");
+            if (arrayStart != -1 && arrayEnd != -1 && arrayEnd > arrayStart) {
+                json = json.substring(arrayStart, arrayEnd + 1).trim();
             }
 
             List<Map<String, Object>> extractedList = objectMapper.readValue(json, new TypeReference<>() {});
@@ -408,6 +438,66 @@ public class MemoryServiceImpl implements MemoryService {
         }
         
         return memories;
+    }
+
+    @Override
+    public void rebuildMemoryVectors() {
+        if (vectorStore == null || milvusClient == null || vectorStoreConfig == null) {
+            throw new BizException(500, "向量数据库组件未注入或不可用");
+        }
+
+        try {
+            // 1. 删除旧集合
+            log.info("开始重建向量库集合: {}", collectionName);
+            try {
+                milvusClient.dropCollection(DropCollectionParam.newBuilder()
+                        .withCollectionName(collectionName)
+                        .build());
+                log.info("成功删除旧 Milvus 集合: {}", collectionName);
+            } catch (Exception e) {
+                log.warn("删除 Milvus 集合失败或集合不存在: {}", e.getMessage());
+            }
+
+            // 2. 重新初始化 Schema
+            vectorStoreConfig.initMilvusSchema(milvusClient);
+
+            // 3. 从 MySQL 加载所有未删除的记忆数据
+            List<Memory> allMemories = memoryMapper.selectList(new LambdaQueryWrapper<Memory>()
+                    .eq(Memory::getDeleted, 0));
+            log.info("查询到待同步的记忆记录数量: {}", allMemories.size());
+
+            if (allMemories.isEmpty()) {
+                log.info("没有需要同步的历史记忆");
+                return;
+            }
+
+            // 4. 分批同步到向量库
+            int batchSize = 100;
+            for (int i = 0; i < allMemories.size(); i += batchSize) {
+                List<Memory> batch = allMemories.subList(i, Math.min(i + batchSize, allMemories.size()));
+                List<Document> documents = batch.stream()
+                        .filter(m -> m.getContent() != null && !m.getContent().isBlank())
+                        .map(m -> new Document(
+                                m.getId().toString(),
+                                m.getContent(),
+                                Map.of(
+                                        "userId", m.getUserId(),
+                                        "companionId", m.getCompanionId(),
+                                        "category", m.getCategory() != null ? m.getCategory().getCode() : ""
+                                )
+                        ))
+                        .collect(Collectors.toList());
+
+                if (!documents.isEmpty()) {
+                    vectorStore.add(documents);
+                    log.info("成功同步 {} 条记忆数据到向量数据库", documents.size());
+                }
+            }
+            log.info("向量数据库记忆重建及重新同步完成！");
+        } catch (Exception e) {
+            log.error("重建向量数据库失败", e);
+            throw new BizException(500, "重建向量数据库失败: " + e.getMessage());
+        }
     }
 
     private String truncate(String text, int maxLength) {

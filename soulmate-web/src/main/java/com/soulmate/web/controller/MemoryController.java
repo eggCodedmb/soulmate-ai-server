@@ -60,4 +60,13 @@ public class MemoryController {
         memoryService.deleteMemory(userId, id);
         return R.ok();
     }
+
+    /**
+     * 重建向量数据库并将所有 MySQL 中的历史记忆重新同步到向量数据库中
+     */
+    @PostMapping("/admin/rebuild-vectors")
+    public R<String> rebuildVectors() {
+        memoryService.rebuildMemoryVectors();
+        return R.ok("向量数据库集合重建及历史数据重同步成功");
+    }
 }

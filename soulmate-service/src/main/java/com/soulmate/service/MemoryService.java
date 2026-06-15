@@ -40,4 +40,9 @@ public interface MemoryService {
      * RAG 检索相关记忆
      */
     List<Memory> retrieveRelevantMemories(Long userId, Long companionId, String query);
+
+    /**
+     * 重建向量数据库并将所有 MySQL 记忆重新同步至向量库
+     */
+    void rebuildMemoryVectors();
 }

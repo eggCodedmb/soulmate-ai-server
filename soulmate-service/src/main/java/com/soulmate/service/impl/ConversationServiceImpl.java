@@ -127,23 +127,27 @@ public class ConversationServiceImpl implements ConversationService {
                     .build());
         }
 
-        // 保存用户消息
-        Message userMessage = new Message();
-        userMessage.setConversationId(conversation.getId());
-        userMessage.setSenderType(SenderType.USER);
-        userMessage.setContent(request.getContent());
-        userMessage.setContentType(ContentType.valueOf(request.getContentType().toUpperCase()));
-        userMessage.setReadStatus(1);
-        userMessage.setCreateTime(LocalDateTime.now());
-        messageMapper.insert(userMessage);
+        boolean isVoiceCall = "voice_call".equalsIgnoreCase(request.getSceneMode());
 
-        // 更新会话
-        conversation.setLastMessagePreview(
-                request.getContent().length() > 100
-                        ? request.getContent().substring(0, 100) + "..."
-                        : request.getContent());
-        conversation.setLastMessageTime(LocalDateTime.now());
-        conversationMapper.updateById(conversation);
+        if (!isVoiceCall) {
+            // 保存用户消息
+            Message userMessage = new Message();
+            userMessage.setConversationId(conversation.getId());
+            userMessage.setSenderType(SenderType.USER);
+            userMessage.setContent(request.getContent());
+            userMessage.setContentType(ContentType.valueOf(request.getContentType().toUpperCase()));
+            userMessage.setReadStatus(1);
+            userMessage.setCreateTime(LocalDateTime.now());
+            messageMapper.insert(userMessage);
+
+            // 更新会话
+            conversation.setLastMessagePreview(
+                    request.getContent().length() > 100
+                            ? request.getContent().substring(0, 100) + "..."
+                            : request.getContent());
+            conversation.setLastMessageTime(LocalDateTime.now());
+            conversationMapper.updateById(conversation);
+        }
 
         // 增加消息计数
         subscriptionService.incrementDailyMessageCount(userId);
@@ -174,24 +178,26 @@ public class ConversationServiceImpl implements ConversationService {
                                 .replaceAll("(?s)<query [^>]*>.*?</query>", "")
                                 .trim();
 
-                        // 保存AI回复消息
-                        Message aiMessage = new Message();
-                        aiMessage.setConversationId(conversation.getId());
-                        aiMessage.setSenderType(SenderType.COMPANION);
-                        aiMessage.setContent(cleanReply);
-                        aiMessage.setContentType(ContentType.TEXT);
-                        aiMessage.setReadStatus(0);
-                        aiMessage.setCreateTime(LocalDateTime.now());
-                        messageMapper.insert(aiMessage);
+                        if (!isVoiceCall) {
+                            // 保存AI回复消息
+                            Message aiMessage = new Message();
+                            aiMessage.setConversationId(conversation.getId());
+                            aiMessage.setSenderType(SenderType.COMPANION);
+                            aiMessage.setContent(cleanReply);
+                            aiMessage.setContentType(ContentType.TEXT);
+                            aiMessage.setReadStatus(0);
+                            aiMessage.setCreateTime(LocalDateTime.now());
+                            messageMapper.insert(aiMessage);
 
-                        // 更新会话最后消息
-                        conversation.setLastMessagePreview(
-                                cleanReply.length() > 100 ? cleanReply.substring(0, 100) + "..." : cleanReply);
-                        conversation.setLastMessageTime(LocalDateTime.now());
-                        conversationMapper.updateById(conversation);
+                            // 更新会话最后消息
+                            conversation.setLastMessagePreview(
+                                    cleanReply.length() > 100 ? cleanReply.substring(0, 100) + "..." : cleanReply);
+                            conversation.setLastMessageTime(LocalDateTime.now());
+                            conversationMapper.updateById(conversation);
 
-                        // 异步提取记忆
-                        memoryService.extractMemories(userId, companion.getId(), conversation.getId());
+                            // 异步提取记忆
+                            memoryService.extractMemories(userId, companion.getId(), conversation.getId());
+                        }
                         log.info("AI回复并保存成功: conversationId={}", conversation.getId());
                     }
                 });
@@ -239,24 +245,28 @@ public class ConversationServiceImpl implements ConversationService {
                                 .replaceAll("(?s)<query [^>]*>.*?</query>", "")
                                 .trim();
 
-                        // 保存AI回复消息到数据库
-                        Message aiMessage = new Message();
-                        aiMessage.setConversationId(conversation.getId());
-                        aiMessage.setSenderType(SenderType.COMPANION);
-                        aiMessage.setContent(cleanReply);
-                        aiMessage.setContentType(ContentType.TEXT);
-                        aiMessage.setReadStatus(0);
-                        aiMessage.setCreateTime(LocalDateTime.now());
-                        messageMapper.insert(aiMessage);
+                        boolean isVoiceCall = "voice_call".equalsIgnoreCase(request.getSceneMode());
 
-                        // 更新会话最后消息
-                        conversation.setLastMessagePreview(
-                                cleanReply.length() > 100 ? cleanReply.substring(0, 100) + "..." : cleanReply);
-                        conversation.setLastMessageTime(LocalDateTime.now());
-                        conversationMapper.updateById(conversation);
+                        if (!isVoiceCall) {
+                            // 保存AI回复消息到数据库
+                            Message aiMessage = new Message();
+                            aiMessage.setConversationId(conversation.getId());
+                            aiMessage.setSenderType(SenderType.COMPANION);
+                            aiMessage.setContent(cleanReply);
+                            aiMessage.setContentType(ContentType.TEXT);
+                            aiMessage.setReadStatus(0);
+                            aiMessage.setCreateTime(LocalDateTime.now());
+                            messageMapper.insert(aiMessage);
 
-                        // 异步提取记忆
-                        memoryService.extractMemories(userId, companion.getId(), conversation.getId());
+                            // 更新会话最后消息
+                            conversation.setLastMessagePreview(
+                                    cleanReply.length() > 100 ? cleanReply.substring(0, 100) + "..." : cleanReply);
+                            conversation.setLastMessageTime(LocalDateTime.now());
+                            conversationMapper.updateById(conversation);
+
+                            // 异步提取记忆
+                            memoryService.extractMemories(userId, companion.getId(), conversation.getId());
+                        }
                         log.info("AI开场白回复并保存成功: conversationId={}", conversation.getId());
                     }
                 });
@@ -275,15 +285,19 @@ public class ConversationServiceImpl implements ConversationService {
             throw new BizException(ResultCode.CONVERSATION_NOT_FOUND);
         }
 
-        // 保存用户消息
-        Message userMessage = new Message();
-        userMessage.setConversationId(conversation.getId());
-        userMessage.setSenderType(SenderType.USER);
-        userMessage.setContent(request.getContent());
-        userMessage.setContentType(ContentType.TEXT);
-        userMessage.setReadStatus(1);
-        userMessage.setCreateTime(LocalDateTime.now());
-        messageMapper.insert(userMessage);
+        boolean isVoiceCall = "voice_call".equalsIgnoreCase(request.getSceneMode());
+
+        if (!isVoiceCall) {
+            // 保存用户消息
+            Message userMessage = new Message();
+            userMessage.setConversationId(conversation.getId());
+            userMessage.setSenderType(SenderType.USER);
+            userMessage.setContent(request.getContent());
+            userMessage.setContentType(ContentType.TEXT);
+            userMessage.setReadStatus(1);
+            userMessage.setCreateTime(LocalDateTime.now());
+            messageMapper.insert(userMessage);
+        }
 
         // 获取伴侣信息并调用AI
         Companion companion = companionMapper.selectById(request.getCompanionId());
@@ -300,24 +314,34 @@ public class ConversationServiceImpl implements ConversationService {
                 .replaceAll("(?s)<query [^>]*>.*?</query>", "")
                 .trim();
 
-        // 保存AI回复
-        Message aiMessage = new Message();
-        aiMessage.setConversationId(conversation.getId());
-        aiMessage.setSenderType(SenderType.COMPANION);
-        aiMessage.setContent(cleanReply);
-        aiMessage.setContentType(ContentType.TEXT);
-        aiMessage.setReadStatus(0);
-        aiMessage.setCreateTime(LocalDateTime.now());
-        messageMapper.insert(aiMessage);
+        Message aiMessage = null;
+        if (!isVoiceCall) {
+            // 保存AI回复
+            aiMessage = new Message();
+            aiMessage.setConversationId(conversation.getId());
+            aiMessage.setSenderType(SenderType.COMPANION);
+            aiMessage.setContent(cleanReply);
+            aiMessage.setContentType(ContentType.TEXT);
+            aiMessage.setReadStatus(0);
+            aiMessage.setCreateTime(LocalDateTime.now());
+            messageMapper.insert(aiMessage);
 
-        // 更新会话
-        conversation.setLastMessagePreview(
-                cleanReply.length() > 100 ? cleanReply.substring(0, 100) + "..." : cleanReply);
-        conversation.setLastMessageTime(LocalDateTime.now());
-        conversationMapper.updateById(conversation);
+            // 更新会话
+            conversation.setLastMessagePreview(
+                    cleanReply.length() > 100 ? cleanReply.substring(0, 100) + "..." : cleanReply);
+            conversation.setLastMessageTime(LocalDateTime.now());
+            conversationMapper.updateById(conversation);
 
-        // 异步提取记忆
-        memoryService.extractMemories(userId, companion.getId(), conversation.getId());
+            // 异步提取记忆
+            memoryService.extractMemories(userId, companion.getId(), conversation.getId());
+        } else {
+            aiMessage = new Message();
+            aiMessage.setConversationId(conversation.getId());
+            aiMessage.setSenderType(SenderType.COMPANION);
+            aiMessage.setContent(cleanReply);
+            aiMessage.setContentType(ContentType.TEXT);
+            aiMessage.setCreateTime(LocalDateTime.now());
+        }
 
         return aiMessage;
     }
