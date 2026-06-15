@@ -15,7 +15,8 @@ public enum MemoryCategory {
     PERSONAL_INFO("personal_info", "个人信息"),
     SHARED_EXPERIENCE("shared_experience", "共同经历"),
     PREFERENCE("preference", "偏好习惯"),
-    HABIT("habit", "日常习惯");
+    HABIT("habit", "日常习惯"),
+    PRIVATE_PREFERENCE("private_preference", "私密爱好");
 
     @EnumValue
     @JsonValue

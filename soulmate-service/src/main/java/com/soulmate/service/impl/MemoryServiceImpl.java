@@ -20,6 +20,7 @@ import com.soulmate.mapper.ConversationMapper;
 import com.soulmate.mapper.MemoryMapper;
 import com.soulmate.mapper.MemoryTagMapper;
 import com.soulmate.mapper.MessageMapper;
+import com.soulmate.domain.dto.MemoryStatsDTO;
 import com.soulmate.service.MemoryService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -109,6 +110,43 @@ public class MemoryServiceImpl implements MemoryService {
 
         List<Memory> list = memoryMapper.selectList(wrapper);
         return list.stream().map(this::convertToDTO).collect(Collectors.toList());
+    }
+
+    @Override
+    public MemoryStatsDTO getMemoryStats(Long userId, Long companionId) {
+        LambdaQueryWrapper<Memory> wrapper = new LambdaQueryWrapper<Memory>()
+                .eq(Memory::getUserId, userId)
+                .eq(Memory::getUserVisible, 1)
+                .eq(Memory::getDeleted, 0);
+
+        if (companionId != null) {
+            wrapper.eq(Memory::getCompanionId, companionId);
+        }
+
+        List<Memory> list = memoryMapper.selectList(wrapper);
+        MemoryStatsDTO stats = new MemoryStatsDTO();
+        if (list.isEmpty()) {
+            stats.setTotalMemories(0);
+            stats.setAverageImportance(0.0);
+            stats.setCategoryCount(MemoryCategory.values().length);
+            return stats;
+        }
+
+        stats.setTotalMemories(list.size());
+        
+        double avg = list.stream()
+                .mapToInt(m -> m.getImportance() != null ? m.getImportance() : 0)
+                .average()
+                .orElse(0.0);
+        avg = Math.round(avg * 10.0) / 10.0;
+        stats.setAverageImportance(avg);
+
+        stats.setCategoryCount(MemoryCategory.values().length);
+
+        log.info("记忆统计数据计算成功: userId={}, companionId={}, total={}, avg={}, categories={}",
+                userId, companionId, stats.getTotalMemories(), stats.getAverageImportance(), stats.getCategoryCount());
+
+        return stats;
     }
 
     private MemoryDTO convertToDTO(Memory memory) {
@@ -256,12 +294,17 @@ public class MemoryServiceImpl implements MemoryService {
             // 使用 LLM 提取记忆
             String extractPrompt = """
                     你是一个记忆提取专家。请从以下对话中提取用户分享的、值得伴侣长期记住的关键信息。
-                    重点关注：用户的兴趣爱好、生活习惯、重要的个人经历、对事物的看法、对伴侣的要求等。
+                    重点关注：用户的兴趣爱好、日常习惯、个人经历、对事物的看法、对伴侣的要求，以及私密爱好等。
                     
                     输出要求：
                     1. 必须返回 JSON 数组格式
                     2. 每条记忆包含以下字段: 
-                       - category: 枚举值 (personal_info, shared_experience, preference, habit)
+                       - category: 枚举值。必须使用以下值之一：
+                         * personal_info: 个人基本信息（如姓名、职业、生日、家人等）。
+                         * shared_experience: 共同经历（用户与AI共同发生过的事情或讨论过的重要事件）。
+                         * preference: 偏好习惯。仅限日常公共偏好，如食物口味（喜欢吃辣/不喜欢香菜）、兴趣爱好（看电影/打篮球）、颜色/作息等日常公共层面的偏好。**绝对不要包含任何性或亲密隐私方面的内容。**
+                         * habit: 日常习惯行为。
+                         * private_preference: 私密爱好。专门记录主人和伴侣在性与亲密隐私方面的偏好，包括敏感部位、喜欢的部位、性喜好、性幻想等私密层面的爱好。**与日常公共偏好严格区分。**
                        - title: 简短的标题 (10字以内)
                        - content: 具体的记忆内容 (50字以内，以第三人称描述用户，例如“用户喜欢吃辣”)
                        - thought: AI的内心独白/感悟 (20字以内，例如“他竟然不喜欢吃香菜，记下来下次避开”)
@@ -305,11 +348,21 @@ public class MemoryServiceImpl implements MemoryService {
             // 确保只提取 JSON 数组 [ ... ] 部分
             int arrayStart = json.indexOf("[");
             int arrayEnd = json.lastIndexOf("]");
-            if (arrayStart != -1 && arrayEnd != -1 && arrayEnd > arrayStart) {
-                json = json.substring(arrayStart, arrayEnd + 1).trim();
+            if (arrayStart == -1 || arrayEnd == -1 || arrayEnd <= arrayStart) {
+                log.info("未从AI响应中找到JSON数组结构，跳过记忆提取。userId={}, conversationId={}, response={}", 
+                        userId, conversationId, response.trim());
+                return;
             }
+            json = json.substring(arrayStart, arrayEnd + 1).trim();
 
-            List<Map<String, Object>> extractedList = objectMapper.readValue(json, new TypeReference<>() {});
+            List<Map<String, Object>> extractedList;
+            try {
+                extractedList = objectMapper.readValue(json, new TypeReference<>() {});
+            } catch (Exception e) {
+                log.warn("解析AI提取的记忆JSON失败: userId={}, conversationId={}, json={}, error={}", 
+                        userId, conversationId, json, e.getMessage());
+                return;
+            }
             
             for (Map<String, Object> item : extractedList) {
                 try {

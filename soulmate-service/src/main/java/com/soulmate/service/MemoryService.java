@@ -1,6 +1,7 @@
 package com.soulmate.service;
 
 import com.soulmate.domain.dto.MemoryDTO;
+import com.soulmate.domain.dto.MemoryStatsDTO;
 import com.soulmate.domain.entity.Memory;
 import com.soulmate.domain.enums.MemoryCategory;
 
@@ -45,4 +46,9 @@ public interface MemoryService {
      * 重建向量数据库并将所有 MySQL 记忆重新同步至向量库
      */
     void rebuildMemoryVectors();
+
+    /**
+     * 获取长期记忆统计数据
+     */
+    MemoryStatsDTO getMemoryStats(Long userId, Long companionId);
 }

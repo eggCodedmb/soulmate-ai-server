@@ -2,6 +2,7 @@ package com.soulmate.web.controller;
 
 import com.soulmate.common.response.R;
 import com.soulmate.domain.dto.MemoryDTO;
+import com.soulmate.domain.dto.MemoryStatsDTO;
 import com.soulmate.domain.entity.Memory;
 import com.soulmate.domain.enums.MemoryCategory;
 import com.soulmate.service.MemoryService;
@@ -28,6 +29,15 @@ public class MemoryController {
                                            @RequestParam(required = false) Long companionId,
                                            @RequestParam(required = false) MemoryCategory category) {
         return R.ok(memoryService.listMemories(userId, companionId, category));
+    }
+
+    /**
+     * 获取记忆统计数据
+     */
+    @GetMapping("/stats")
+    public R<MemoryStatsDTO> getMemoryStats(@RequestAttribute("currentUserId") Long userId,
+                                             @RequestParam(required = false) Long companionId) {
+        return R.ok(memoryService.getMemoryStats(userId, companionId));
     }
 
     /**
