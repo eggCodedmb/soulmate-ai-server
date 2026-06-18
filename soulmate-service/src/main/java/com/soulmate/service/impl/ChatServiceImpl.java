@@ -7,6 +7,7 @@ import com.soulmate.domain.dto.ChatRequest;
 import com.soulmate.domain.dto.ChatResponse;
 import com.soulmate.ai.mcp.TimeToolService;
 import com.soulmate.ai.mcp.WeatherToolService;
+import com.soulmate.common.config.AiProperties;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -35,6 +36,7 @@ public class ChatServiceImpl implements ChatService {
     private final WeatherToolService weatherToolService;
     private final TimeToolService timeToolService;
     private final DynamicLlmService dynamicLlmService;
+    private final AiProperties aiProperties;
 
     /** 核心聊天客户端（集成所有工具） */
     private ChatClient chatClient;
@@ -75,7 +77,7 @@ public class ChatServiceImpl implements ChatService {
                     .messages(messages)
                     .stream()
                     .chatResponse()
-                    .timeout(Duration.ofSeconds(60))
+                    .timeout(Duration.ofSeconds(aiProperties.getTimeoutSeconds()))
                     .map(response -> {
                         String content = "";
                         if (response.getResult() != null && response.getResult().getOutput() != null) {

@@ -5,6 +5,8 @@ import com.openai.client.OpenAIClient;
 import com.openai.client.OpenAIClientAsync;
 import com.openai.client.okhttp.OpenAIOkHttpClient;
 import com.openai.client.okhttp.OpenAIOkHttpClientAsync;
+import com.soulmate.common.config.AiProperties;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.ollama.OllamaChatModel;
@@ -23,8 +25,10 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class DynamicLlmService {
 
+    private final AiProperties aiProperties;
     private final ConcurrentHashMap<String, ChatModel> modelCache = new ConcurrentHashMap<>();
 
     /**
@@ -85,13 +89,13 @@ public class DynamicLlmService {
             OpenAIClient openAiClient = OpenAIOkHttpClient.builder()
                     .baseUrl(baseUrl)
                     .apiKey(effectiveKey)
-                    .timeout(Duration.ofSeconds(30))
+                    .timeout(Duration.ofSeconds(aiProperties.getTimeoutSeconds()))
                     .build();
 
             OpenAIClientAsync openAiClientAsync = OpenAIOkHttpClientAsync.builder()
                     .baseUrl(baseUrl)
                     .apiKey(effectiveKey)
-                    .timeout(Duration.ofSeconds(30))
+                    .timeout(Duration.ofSeconds(aiProperties.getTimeoutSeconds()))
                     .build();
 
             OpenAiChatOptions options = OpenAiChatOptions.builder()

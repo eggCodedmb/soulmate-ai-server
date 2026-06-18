@@ -27,6 +27,9 @@ public class AiProperties {
     /** API Key */
     private String apiKey;
 
+    /** AI 接口响应超时时间（秒），默认 180 秒 */
+    private int timeoutSeconds = 180;
+
     /** ASR 语音识别配置 */
     private Asr asr = new Asr();
 
