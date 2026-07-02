@@ -58,7 +58,7 @@ Dependency chain: `web → service → mapper → domain`, `web → common`, `se
 
 Application config is in `soulmate-app/src/main/resources/application.yml`. Custom config prefix: `soulmate.*` (JWT settings, free-tier limits, AI model settings). Properties classes: `AiProperties`, `JwtProperties`, `LimitProperties` (all in `soulmate-common`).
 
-The AI model defaults to `mimo-v2.5-pro` via OpenAI-compatible API at `https://token-plan-sgp.xiaomimimo.com/v1`. Spring AI is configured under `spring.ai.openai.*`.
+The AI model defaults to `mimo-v2.5-pro` via OpenAI-compatible API at `https://api.xiaomimimo.com/v1`. Spring AI is configured under `spring.ai.openai.*`.
 
 ## Conventions
 

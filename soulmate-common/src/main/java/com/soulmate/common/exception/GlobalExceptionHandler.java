@@ -11,6 +11,8 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import org.springframework.web.servlet.resource.NoResourceFoundException;
+
 import java.util.stream.Collectors;
 
 /**
@@ -49,6 +51,13 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public R<Void> handleConstraintViolation(ConstraintViolationException e) {
         return R.fail(ResultCode.PARAM_ERROR.getCode(), e.getMessage());
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public R<Void> handleNoResourceFoundException(NoResourceFoundException e) {
+        log.warn("资源未找到: {}", e.getMessage());
+        return R.fail(ResultCode.FILE_NOT_FOUND.getCode(), "文件或资源不存在");
     }
 
     @ExceptionHandler(Exception.class)

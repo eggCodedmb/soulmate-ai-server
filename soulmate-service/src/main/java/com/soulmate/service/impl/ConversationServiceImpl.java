@@ -63,7 +63,7 @@ public class ConversationServiceImpl implements ConversationService {
         conversation.setSceneMode(SceneMode.DAILY);
         conversation.setUnreadCount(0);
         conversation.setPinned(0);
-        conversation.setContextWindow(50);
+        conversation.setContextWindow(15);
         conversation.setCreateTime(LocalDateTime.now());
         conversation.setUpdateTime(LocalDateTime.now());
         conversationMapper.insert(conversation);

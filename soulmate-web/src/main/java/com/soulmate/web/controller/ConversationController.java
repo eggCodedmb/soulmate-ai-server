@@ -9,9 +9,11 @@ import com.soulmate.domain.dto.ChatRequest;
 import com.soulmate.domain.dto.ChatResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import reactor.core.publisher.Flux;
 
 import java.util.List;
@@ -19,6 +21,7 @@ import java.util.List;
 /**
  * 对话控制器
  */
+@Slf4j
 @RestController
 @RequestMapping("/api")
 @RequiredArgsConstructor
@@ -57,13 +60,32 @@ public class ConversationController {
      * 发送消息（SSE流式AI回复）
      */
     @PostMapping(value = "/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public ResponseEntity<Flux<ChatResponse>> streamChat(@RequestAttribute("currentUserId") Long userId,
-                                                          @Valid @RequestBody ChatRequest request) {
+    public ResponseEntity<SseEmitter> streamChat(@RequestAttribute("currentUserId") Long userId,
+                                                 @Valid @RequestBody ChatRequest request) {
+        SseEmitter emitter = new SseEmitter(0L);
+
         Flux<ChatResponse> flux = conversationService.sendMessage(userId, request);
-        // 使用 ResponseEntity 安全地设置 Header，避免破坏 Spring Security 异步上下文
+
+        flux.subscribe(
+            chatResponse -> {
+                try {
+                    emitter.send(chatResponse);
+                } catch (Exception e) {
+                    log.warn("SSE发送失败: userId={}, error={}", userId, e.getMessage());
+                }
+            },
+            error -> {
+                emitter.completeWithError(error);
+            },
+            () -> {
+                emitter.complete();
+            }
+        );
+
         return ResponseEntity.ok()
                 .header("X-Accel-Buffering", "no")
-                .body(flux);
+                .contentType(MediaType.TEXT_EVENT_STREAM)
+                .body(emitter);
     }
 
     /**

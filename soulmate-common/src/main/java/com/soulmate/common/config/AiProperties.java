@@ -22,7 +22,7 @@ public class AiProperties {
     private String systemPromptTemplate = "classpath:prompts/system-prompt.st";
 
     /** API 基础地址 */
-    private String baseUrl = "https://token-plan-sgp.xiaomimimo.com/v1";
+    private String baseUrl = "https://api.xiaomimimo.com/v1";
 
     /** API Key */
     private String apiKey;

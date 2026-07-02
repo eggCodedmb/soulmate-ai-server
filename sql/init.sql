@@ -130,7 +130,7 @@ CREATE TABLE IF NOT EXISTS t_conversation (
     last_message_time    TIMESTAMP,
     unread_count         INT          DEFAULT 0,
     pinned               SMALLINT     DEFAULT 0,
-    context_window       INT          DEFAULT 50,
+    context_window       INT          DEFAULT 15,
     create_time          TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     update_time          TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     deleted              SMALLINT     DEFAULT 0
@@ -382,7 +382,7 @@ VALUES
     (2, 'claude-3.5',    'Claude 3.5 Sonnet', 'anthropic', 'https://api.anthropic.com/v1',              4096, 0.7, 1, 1, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     (3, 'qwen-max',      '通义千问 Max',         'alibaba',   'https://dashscope.aliyuncs.com/api/v1',    4096, 0.7, 1, 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     (4, 'local-default', '本地模型',             'local',     'http://localhost:1234/v1',                  4096, 0.7, 1, 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    (5, 'mimo-v2.5-pro', 'mimo-v2.5-pro',     'xiaomi',    'https://token-plan-sgp.xiaomimimo.com/v1', 2048, 0.7, 1, 0, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+    (5, 'mimo-v2.5-pro', 'mimo-v2.5-pro',     'xiaomi',    'https://api.xiaomimimo.com/v1', 2048, 0.7, 1, 0, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 ON CONFLICT (model_code) DO NOTHING;
 
 -- =============================================

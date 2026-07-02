@@ -31,3 +31,6 @@ set-env-vars.ps1
 
 online
 milvus-lite
+deploy.py
+deploy.bat
+deploy.ps1

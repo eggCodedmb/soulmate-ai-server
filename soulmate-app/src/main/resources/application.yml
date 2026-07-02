@@ -79,8 +79,8 @@ spring:
     vectorstore:
       milvus:
         client:
-          host: ${MILVUS_HOST:127.0.0.1}
-          port: ${MILVUS_PORT:19530}
+          host: 41r501n860.wicp.vip
+          port: 19530
         collection-name: memory_vectors
         embedding-dimension: 384
         index-type: FLAT

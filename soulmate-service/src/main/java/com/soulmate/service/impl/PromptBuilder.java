@@ -73,8 +73,69 @@ public class PromptBuilder {
             messages.add(new UserMessage(userMessage));
         }
 
-        return messages;
+        return sanitizeMessages(messages);
     }
+
+    /**
+     * 清理和格式化消息列表，确保角色（user / assistant）严格交替，合并连续的同角色消息，
+     * 并确保对话在系统提示词之后以 user 角色开始，避免 llama.cpp 等严格模板解析器报错。
+     */
+    private List<Message> sanitizeMessages(List<Message> messages) {
+        if (messages == null || messages.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        List<Message> systemMessages = new ArrayList<>();
+        List<Message> chatMessages = new ArrayList<>();
+
+        // 1. 分离系统消息和普通消息，过滤空消息
+        for (Message msg : messages) {
+            if (msg instanceof SystemMessage) {
+                systemMessages.add(msg);
+            } else {
+                String content = msg.getText();
+                if (content != null && !content.trim().isEmpty()) {
+                    chatMessages.add(msg);
+                }
+            }
+        }
+
+        // 2. 合并连续相同角色的消息，并确保以 user 开始交替
+        List<Message> sanitizedChat = new ArrayList<>();
+        for (Message msg : chatMessages) {
+            if (sanitizedChat.isEmpty()) {
+                // 必须以 user 开始
+                if (msg instanceof UserMessage) {
+                    sanitizedChat.add(msg);
+                } else {
+                    log.warn("跳过不合规的对话起始消息（非 user 角色）: {}", msg.getText());
+                }
+            } else {
+                Message last = sanitizedChat.get(sanitizedChat.size() - 1);
+                if ((last instanceof UserMessage && msg instanceof UserMessage) ||
+                    (last instanceof AssistantMessage && msg instanceof AssistantMessage)) {
+                    // 合并内容
+                    String mergedContent = last.getText() + "\n" + msg.getText();
+                    sanitizedChat.remove(sanitizedChat.size() - 1);
+                    if (msg instanceof UserMessage) {
+                        sanitizedChat.add(new UserMessage(mergedContent));
+                    } else {
+                        sanitizedChat.add(new AssistantMessage(mergedContent));
+                    }
+                } else {
+                    sanitizedChat.add(msg);
+                }
+            }
+        }
+
+        // 3. 组合系统消息和过滤合并后的普通对话消息
+        List<Message> result = new ArrayList<>();
+        result.addAll(systemMessages);
+        result.addAll(sanitizedChat);
+        return result;
+    }
+    
+
 
     /**
      * 构建系统提示词 — 伴侣人格 + 关系设定 + 场景模式 + 长期记忆

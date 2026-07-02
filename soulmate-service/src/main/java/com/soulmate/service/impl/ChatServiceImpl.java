@@ -23,7 +23,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * AI 聊天服务实现
- * 使用 Spring AI ChatClient 调用 mimo-v2.5-pro（OpenAI 兼容 API）
+ * 使用 Spring AI ChatClient 调用 LLM（OpenAI 兼容 API）
  */
 @Slf4j
 @Service
@@ -43,8 +43,6 @@ public class ChatServiceImpl implements ChatService {
 
     @PostConstruct
     public void init() {
-        // 建议：将所有常用工具注册到同一个客户端，让 LLM 自行判断调用时机
-        // 这样可以避免关键词匹配不准确导致工具无法调用的问题
         chatClient = chatClientBuilder
                 .defaultTools(weatherToolService, timeToolService)
                 .build();
@@ -62,17 +60,16 @@ public class ChatServiceImpl implements ChatService {
                     request != null && request.getLlmProviderType() != null ? request.getLlmProviderType() : "system",
                     request != null && request.getLlmModel() != null ? request.getLlmModel() : "default");
 
-            // 解析合适的 ChatClient
-            ChatClient client = resolveDynamicClient(request);
-
             // 1. 先保存用户消息到上下文（如果是开场白，跳过用户指令的保存，只保存稍后AI生成的开场白）
             if (!"[GREETING]".equals(userMessage)) {
                 promptBuilder.saveContext(conversation.getId(), "user", userMessage, conversation.getContextWindow());
             }
 
+            ChatClient client = resolveDynamicClient(request);
             AtomicInteger chunkCount = new AtomicInteger(0);
             StringBuilder fullContent = new StringBuilder();
 
+            // Spring AI 2.0.0: stream() 只在 tool call 时缓冲，普通文本流逐 chunk 发射
             return client.prompt()
                     .messages(messages)
                     .stream()
@@ -83,8 +80,7 @@ public class ChatServiceImpl implements ChatService {
                         if (response.getResult() != null && response.getResult().getOutput() != null) {
                             content = response.getResult().getOutput().getText();
                         }
-                        
-                        // 某些模型可能会返回 null 或空字符串的 chunk，跳过处理
+
                         if (content == null || content.isEmpty()) {
                             return ChatResponse.builder()
                                     .conversationId(conversation.getId())
@@ -93,13 +89,12 @@ public class ChatServiceImpl implements ChatService {
                                     .build();
                         }
 
-                        // 累加完整内容用于保存上下文
                         fullContent.append(content);
-                        
+
                         int count = chunkCount.incrementAndGet();
                         log.debug("SSE Chunk #{}: size={}, content=[{}]", count, content.length(),
                                 content.replace("\n", "\\n"));
-                        
+
                         return ChatResponse.builder()
                                 .conversationId(conversation.getId())
                                 .content(content)
@@ -109,7 +104,6 @@ public class ChatServiceImpl implements ChatService {
                     .doOnComplete(() -> {
                         log.info("SSE流完成: userId={}, conversationId={}, totalChunks={}",
                                 userId, conversation.getId(), chunkCount.get());
-                        // 2. 流完成后保存 AI 回复到上下文
                         if (fullContent.length() > 0) {
                             promptBuilder.saveContext(conversation.getId(), "assistant", fullContent.toString(), conversation.getContextWindow());
                         }
@@ -121,7 +115,7 @@ public class ChatServiceImpl implements ChatService {
                         } else if (e.getMessage() != null && e.getMessage().contains("quota exhausted")) {
                             errorMsg = "AI额度已用尽，请检查账户余额或更换API Key";
                         }
-                        
+
                         log.error("AI流式响应异常: userId={}, conversationId={}, errorType={}, msg={}, chunksBeforeError={}",
                                 userId, conversation.getId(), e.getClass().getSimpleName(), e.getMessage(), chunkCount.get());
                         return Flux.just(ChatResponse.builder()
@@ -159,7 +153,6 @@ public class ChatServiceImpl implements ChatService {
                     request != null && request.getLlmProviderType() != null ? request.getLlmProviderType() : "system",
                     request != null && request.getLlmModel() != null ? request.getLlmModel() : "default");
 
-            // 1. 保存用户消息
             promptBuilder.saveContext(conversation.getId(), "user", userMessage, conversation.getContextWindow());
 
             org.springframework.ai.chat.model.ChatResponse response = client.prompt()
@@ -169,7 +162,6 @@ public class ChatServiceImpl implements ChatService {
 
             if (response.getResult() != null && response.getResult().getOutput() != null) {
                 String content = response.getResult().getOutput().getText();
-                // 2. 保存 AI 回复
                 if (content != null) {
                     promptBuilder.saveContext(conversation.getId(), "assistant", content, conversation.getContextWindow());
                 }
@@ -194,7 +186,6 @@ public class ChatServiceImpl implements ChatService {
         if (model == chatModel) {
             return chatClient;
         }
-        // 如果是动态模型，创建一个集成工具的新客户端
         return ChatClient.builder(model)
                 .defaultTools(weatherToolService, timeToolService)
                 .build();

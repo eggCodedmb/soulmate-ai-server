@@ -1,10 +1,6 @@
 package com.soulmate.service.impl;
 
 import com.soulmate.domain.dto.ChatRequest;
-import com.openai.client.OpenAIClient;
-import com.openai.client.OpenAIClientAsync;
-import com.openai.client.okhttp.OpenAIOkHttpClient;
-import com.openai.client.okhttp.OpenAIOkHttpClientAsync;
 import com.soulmate.common.config.AiProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -16,7 +12,6 @@ import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.stereotype.Service;
 
-import java.time.Duration;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -67,14 +62,14 @@ public class DynamicLlmService {
                 log.info("创建动态 Ollama ChatModel: baseUrl={}, model={}", baseUrl, effectiveModel);
                 // 移除 /v1 后缀，Ollama 内部 API 使用基础 URL
                 String nativeUrl = baseUrl.replaceAll("/v1/?$", "");
-                
+
                 OllamaApi ollamaApi = OllamaApi.builder()
                         .baseUrl(nativeUrl)
                         .build();
 
                 return OllamaChatModel.builder()
                         .ollamaApi(ollamaApi)
-                        .defaultOptions(OllamaChatOptions.builder()
+                        .options(OllamaChatOptions.builder()
                                 .model(effectiveModel)
                                 .disableThinking() // 禁用 thinking 模式，解决推理模型 content 为空的问题
                                 .temperature(0.7)
@@ -83,30 +78,19 @@ public class DynamicLlmService {
                         .build();
             }
 
+            // Spring AI 2.0.0: baseUrl 和 apiKey 移入 OpenAiChatOptions，无需直接创建 HTTP 客户端
             log.info("创建动态 OpenAI ChatModel: baseUrl={}, model={}", baseUrl, effectiveModel);
-            String effectiveKey = (apiKey != null && !apiKey.isEmpty()) ? apiKey : "ollama";
-
-            OpenAIClient openAiClient = OpenAIOkHttpClient.builder()
-                    .baseUrl(baseUrl)
-                    .apiKey(effectiveKey)
-                    .timeout(Duration.ofSeconds(aiProperties.getTimeoutSeconds()))
-                    .build();
-
-            OpenAIClientAsync openAiClientAsync = OpenAIOkHttpClientAsync.builder()
-                    .baseUrl(baseUrl)
-                    .apiKey(effectiveKey)
-                    .timeout(Duration.ofSeconds(aiProperties.getTimeoutSeconds()))
-                    .build();
+            String effectiveKey = (apiKey != null && !apiKey.isEmpty()) ? apiKey : "no-key";
 
             OpenAiChatOptions options = OpenAiChatOptions.builder()
+                    .baseUrl(baseUrl)
+                    .apiKey(effectiveKey)
                     .model(effectiveModel)
                     .temperature(0.7)
                     .maxTokens(2048)
                     .build();
 
             return OpenAiChatModel.builder()
-                    .openAiClient(openAiClient)
-                    .openAiClientAsync(openAiClientAsync)
                     .options(options)
                     .build();
         });
