@@ -1,0 +1,17 @@
+spring:
+  ai:
+    embedding:
+      transformer:
+        onnx:
+          modelUri: classpath:models/e5-small-v2/model.onnx
+        tokenizer:
+          uri: classpath:models/e5-small-v2/tokenizer.json
+    vectorstore:
+      milvus:
+        client:
+          host: ${MILVUS_HOST:milvus}
+          port: ${MILVUS_PORT:19530}
+
+soulmate:
+  file:
+    base-dir: /app/data

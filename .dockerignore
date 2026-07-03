@@ -1,0 +1,32 @@
+# Git
+.git
+.gitignore
+
+# IDE
+.idea
+.vscode
+*.iml
+
+# Build
+**/target/
+!soulmate-app/target/*.jar
+
+# Docker
+docker-compose.yml
+.env
+.dockerignore
+
+# Docs
+*.md
+!README.md
+服务器信息.txt
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Online data (will be mounted as volume)
+online/

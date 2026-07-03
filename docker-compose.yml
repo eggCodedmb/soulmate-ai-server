@@ -1,0 +1,199 @@
+version: "3.8"
+
+services:
+  # ==================== 基础设施 ====================
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: soulmate-postgres
+    restart: always
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-soulmate}
+      POSTGRES_USER: ${POSTGRES_USER:-soulmate}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-soulmate2026}
+      TZ: Asia/Shanghai
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./sql/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-soulmate}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - soulmate-net
+
+  redis:
+    image: redis:7-alpine
+    container_name: soulmate-redis
+    restart: always
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-soulmate2026}
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-soulmate2026}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - soulmate-net
+
+  # ==================== Milvus 向量数据库 ====================
+
+  milvus-etcd:
+    image: quay.io/coreos/etcd:v3.5.18
+    container_name: soulmate-milvus-etcd
+    restart: always
+    environment:
+      ETCD_AUTO_COMPACTION_MODE: revision
+      ETCD_AUTO_COMPACTION_RETENTION: "1000"
+      ETCD_QUOTA_BACKEND_BYTES: "4294967296"
+      ETCD_SNAPSHOT_COUNT: "50000"
+    volumes:
+      - milvus_etcd_data:/etcd
+    command: etcd -advertise-client-urls=http://127.0.0.1:2379 -listen-client-urls http://0.0.0.0:2379 --data-dir /etcd
+    healthcheck:
+      test: ["CMD", "etcdctl", "endpoint", "health"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    networks:
+      - soulmate-net
+
+  milvus-minio:
+    image: minio/minio:RELEASE.2023-03-20T20-16-18Z
+    container_name: soulmate-milvus-minio
+    restart: always
+    environment:
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
+    ports:
+      - "9001:9001"
+      - "9000:9000"
+    volumes:
+      - milvus_minio_data:/minio_data
+    command: minio server /minio_data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    networks:
+      - soulmate-net
+
+  milvus:
+    image: milvusdb/milvus:v2.5.6
+    container_name: soulmate-milvus
+    restart: always
+    command: ["milvus", "run", "standalone"]
+    environment:
+      ETCD_ENDPOINTS: milvus-etcd:2379
+      MINIO_ADDRESS: milvus-minio:9000
+    ports:
+      - "${MILVUS_PORT:-19530}:19530"
+      - "9091:9091"
+    volumes:
+      - milvus_data:/var/lib/milvus
+    depends_on:
+      milvus-etcd:
+        condition: service_healthy
+      milvus-minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9091/healthz"]
+      interval: 30s
+      start_period: 90s
+      timeout: 20s
+      retries: 3
+    networks:
+      - soulmate-net
+
+  # ==================== 后端应用 ====================
+
+  soulmate-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: soulmate-app
+    restart: always
+    ports:
+      - "${APP_PORT:-8080}:8080"
+    environment:
+      # 数据库
+      DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-soulmate}
+      DB_USERNAME: ${POSTGRES_USER:-soulmate}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-soulmate2026}
+      # Redis
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      # Milvus
+      MILVUS_HOST: milvus
+      MILVUS_PORT: 19530
+      # JWT
+      JWT_SECRET: ${JWT_SECRET:-soulmate-jwt-secret-key-2026-change-in-production}
+      # AI
+      MIMO_API_KEY: ${MIMO_API_KEY}
+      MIMO_BASE_URL: ${MIMO_BASE_URL:-https://api.xiaomimimo.com/v1}
+      # 邮件
+      MAIL_USERNAME: ${MAIL_USERNAME}
+      MAIL_PASSWORD: ${MAIL_PASSWORD}
+      # 天气
+      QWEATHER_API_KEY: ${QWEATHER_API_KEY}
+      QWEATHER_API_HOST: ${QWEATHER_API_HOST:-https://devapi.qweather.com}
+      # 支付宝
+      ALIPAY_APP_ID: ${ALIPAY_APP_ID}
+      ALIPAY_PRIVATE_KEY: ${ALIPAY_PRIVATE_KEY}
+      ALIPAY_PUBLIC_KEY: ${ALIPAY_PUBLIC_KEY}
+      ALIPAY_NOTIFY_URL: ${ALIPAY_NOTIFY_URL}
+      ALIPAY_RETURN_URL: ${ALIPAY_RETURN_URL}
+      # JVM
+      JAVA_OPTS: "-Xms512m -Xmx1024m -XX:+UseG1GC"
+    volumes:
+      - app_data:/app/data
+      - app_logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      milvus:
+        condition: service_healthy
+    networks:
+      - soulmate-net
+
+  # ==================== Nginx 反向代理 ====================
+
+  nginx:
+    image: nginx:alpine
+    container_name: soulmate-nginx
+    restart: always
+    ports:
+      - "${NGINX_PORT:-80}:80"
+      - "${NGINX_SSL_PORT:-443}:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - app_data:/app/data:ro
+      - nginx_logs:/var/log/nginx
+    depends_on:
+      - soulmate-app
+    networks:
+      - soulmate-net
+
+volumes:
+  postgres_data:
+  redis_data:
+  milvus_etcd_data:
+  milvus_minio_data:
+  milvus_data:
+  app_data:
+  app_logs:
+  nginx_logs:
+
+networks:
+  soulmate-net:
+    driver: bridge
