@@ -43,10 +43,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
-import io.milvus.client.MilvusServiceClient;
-import io.milvus.param.collection.DropCollectionParam;
 import org.springframework.beans.factory.annotation.Value;
-import com.soulmate.service.config.VectorStoreConfig;
 
 /**
  * 记忆服务实现
@@ -65,13 +62,7 @@ public class MemoryServiceImpl implements MemoryService {
     private final ObjectMapper objectMapper;
     private final VectorStore vectorStore;
 
-    @Autowired(required = false)
-    private MilvusServiceClient milvusClient;
-
-    @Autowired(required = false)
-    private VectorStoreConfig vectorStoreConfig;
-
-    @Value("${spring.ai.vectorstore.milvus.collection-name:memory_vectors}")
+    @Value("${spring.ai.vectorstore.pgvector.table-name:memory_vectors}")
     private String collectionName;
 
     public MemoryServiceImpl(MemoryMapper memoryMapper, MemoryTagMapper memoryTagMapper,
@@ -495,24 +486,12 @@ public class MemoryServiceImpl implements MemoryService {
 
     @Override
     public void rebuildMemoryVectors() {
-        if (vectorStore == null || milvusClient == null || vectorStoreConfig == null) {
+        if (vectorStore == null) {
             throw new BizException(500, "向量数据库组件未注入或不可用");
         }
 
         try {
-            // 1. 删除旧集合
-            log.info("开始重建向量库集合: {}", collectionName);
-            try {
-                milvusClient.dropCollection(DropCollectionParam.newBuilder()
-                        .withCollectionName(collectionName)
-                        .build());
-                log.info("成功删除旧 Milvus 集合: {}", collectionName);
-            } catch (Exception e) {
-                log.warn("删除 Milvus 集合失败或集合不存在: {}", e.getMessage());
-            }
-
-            // 2. 重新初始化 Schema
-            vectorStoreConfig.initMilvusSchema(milvusClient);
+            log.info("开始重建向量库");
 
             // 3. 从 MySQL 加载所有未删除的记忆数据
             List<Memory> allMemories = memoryMapper.selectList(new LambdaQueryWrapper<Memory>()

@@ -41,10 +41,10 @@
             <artifactId>spring-boot-starter-mail</artifactId>
         </dependency>
 
-        <!-- Spring AI - Milvus 向量数据库 -->
+        <!-- Spring AI - PgVector 向量数据库 -->
         <dependency>
             <groupId>org.springframework.ai</groupId>
-            <artifactId>spring-ai-starter-vector-store-milvus</artifactId>
+            <artifactId>spring-ai-starter-vector-store-pgvector</artifactId>
         </dependency>
 
         <!-- Spring AI - 本地 ONNX Embedding 模型（替代 OpenAI Embedding API） -->

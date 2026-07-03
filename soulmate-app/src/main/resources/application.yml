@@ -77,15 +77,11 @@ spring:
         tokenizer:
           uri: file:///D:/Code/models/e5-small-v2/tokenizer.json
     vectorstore:
-      milvus:
-        client:
-          host: 41r501n860.wicp.vip
-          port: 19530
-        collection-name: memory_vectors
-        embedding-dimension: 384
-        index-type: FLAT
-        metric-type: COSINE
-        initialize-schema: false
+      pgvector:
+        table-name: memory_vectors
+        initialize-schema: true
+        index-type: HNSW
+        distance-type: COSINE_DISTANCE
 
 # MyBatis-Plus
 mybatis-plus:

@@ -1,8 +1,11 @@
 -- =============================================
 -- SoulMate AI 数据库初始化脚本
--- 数据库: PostgreSQL 16
+-- 数据库: PostgreSQL 16 + pgvector
 -- 创建日期: 2026-06-05
 -- =============================================
+
+-- 创建 pgvector 扩展
+CREATE EXTENSION IF NOT EXISTS vector;
 
 -- 创建数据库（需手动执行）
 -- CREATE DATABASE soulmate WITH ENCODING = 'UTF8' LC_COLLATE = 'en_US.UTF-8';
