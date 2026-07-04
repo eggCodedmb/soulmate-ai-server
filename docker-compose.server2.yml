@@ -44,6 +44,7 @@ services:
       # JVM
       JAVA_OPTS: "${JAVA_OPTS:--Xms128m -Xmx256m -XX:+UseG1GC}"
     volumes:
+      - app_data:/app/data
       - /opt/soulmate-ai/models/e5-small-v2:/models/e5-small-v2:ro
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
@@ -63,11 +64,15 @@ services:
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - app_data:/app/data:ro
     depends_on:
       soulmate-app:
         condition: service_healthy
     networks:
       - app-net
+
+volumes:
+  app_data:
 
 networks:
   app-net:
