@@ -3,9 +3,9 @@ spring:
     embedding:
       transformer:
         onnx:
-          modelUri: classpath:models/e5-small-v2/model.onnx
+          modelUri: file:///models/e5-small-v2/model.onnx
         tokenizer:
-          uri: classpath:models/e5-small-v2/tokenizer.json
+          uri: file:///models/e5-small-v2/tokenizer.json
     vectorstore:
       pgvector:
         table-name: memory_vectors
