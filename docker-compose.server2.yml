@@ -1,0 +1,72 @@
+# =============================================
+# 服务器 2 - 应用服务器
+# IP: 39.108.137.45
+# 角色: Spring Boot + Nginx
+# 配置: 2C2G
+# 部署: bash deploy-server2.sh
+# =============================================
+
+services:
+  soulmate-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: soulmate-app
+    restart: always
+    ports:
+      - "${APP_PORT:-8080}:8080"
+    environment:
+      # 数据库 (Server 1)
+      DB_URL: jdbc:postgresql://${DB_HOST:-154.209.5.177}:5432/${DB_NAME:-soulmate}
+      DB_USERNAME: ${DB_USERNAME:-soulmate}
+      DB_PASSWORD: ${DB_PASSWORD:-soulmate2026}
+      # Redis (Server 1)
+      REDIS_HOST: ${REDIS_HOST:-154.209.5.177}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-soulmate2026}
+      # JWT
+      JWT_SECRET: ${JWT_SECRET:-soulmate-ai-jwt-secret-key-must-be-32bytes-long!}
+      # AI (MiMo)
+      MIMO_API_KEY: ${MIMO_API_KEY}
+      MIMO_BASE_URL: ${MIMO_BASE_URL:-https://api.xiaomimimo.com/v1}
+      # 邮件
+      MAIL_USERNAME: ${MAIL_USERNAME}
+      MAIL_PASSWORD: ${MAIL_PASSWORD}
+      # 天气 (和风天气)
+      QWEATHER_API_KEY: ${QWEATHER_API_KEY}
+      QWEATHER_API_HOST: ${QWEATHER_API_HOST:-https://devapi.qweather.com}
+      # 支付宝
+      ALIPAY_APP_ID: ${ALIPAY_APP_ID:-}
+      ALIPAY_NOTIFY_URL: ${ALIPAY_NOTIFY_URL:-}
+      ALIPAY_RETURN_URL: ${ALIPAY_RETURN_URL:-}
+      # JVM
+      JAVA_OPTS: "${JAVA_OPTS:--Xms128m -Xmx256m -XX:+UseG1GC}"
+    volumes:
+      - /opt/soulmate-ai/models/e5-small-v2:/models/e5-small-v2:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - app-net
+
+  nginx:
+    image: nginx:alpine
+    container_name: soulmate-nginx
+    restart: always
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+    depends_on:
+      soulmate-app:
+        condition: service_healthy
+    networks:
+      - app-net
+
+networks:
+  app-net:
+    driver: bridge
