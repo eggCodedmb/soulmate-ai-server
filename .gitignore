@@ -35,6 +35,8 @@ set-env-vars.ps1
 *.pem
 *.key
 服务器信息.txt
+docker-compose.server1.yml
+docker-compose.server2.yml
 
 online
 milvus-lite
