@@ -2,11 +2,9 @@ package com.soulmate.service.impl;
 
 import cn.hutool.core.util.RandomUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.soulmate.common.config.JwtProperties;
 import com.soulmate.common.constant.RedisConstants;
 import com.soulmate.common.exception.BizException;
 import com.soulmate.common.response.ResultCode;
-import com.soulmate.common.util.JwtUtil;
 import com.soulmate.domain.entity.User;
 import com.soulmate.domain.entity.UserProfile;
 import com.soulmate.domain.entity.UserSettings;
@@ -34,7 +32,6 @@ public class UserServiceImpl implements UserService {
     private final UserProfileMapper userProfileMapper;
     private final UserSettingsMapper userSettingsMapper;
     private final StringRedisTemplate redisTemplate;
-    private final JwtProperties jwtProperties;
     private final EmailService emailService;
 
     @Override

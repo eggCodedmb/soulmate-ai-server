@@ -1,7 +1,6 @@
 package com.soulmate.service.impl;
 
 import com.soulmate.domain.dto.ChatRequest;
-import com.soulmate.common.config.AiProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.model.ChatModel;
@@ -23,7 +22,6 @@ import java.util.concurrent.ConcurrentHashMap;
 @RequiredArgsConstructor
 public class DynamicLlmService {
 
-    private final AiProperties aiProperties;
     private final ConcurrentHashMap<String, ChatModel> modelCache = new ConcurrentHashMap<>();
 
     /**

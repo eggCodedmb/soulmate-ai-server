@@ -1,17 +1,11 @@
 package com.soulmate.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.soulmate.common.exception.BizException;
-import com.soulmate.common.response.ResultCode;
+import com.soulmate.common.util.VectorIdUtil;
 import com.soulmate.domain.dto.MemoryDTO;
-import com.soulmate.domain.entity.Companion;
-import com.soulmate.domain.entity.CompanionPersonality;
-import com.soulmate.domain.entity.Conversation;
 import com.soulmate.domain.entity.Memory;
-import com.soulmate.domain.entity.MemoryTag;
 import com.soulmate.domain.entity.Message;
-import com.soulmate.domain.enums.ContentType;
 import com.soulmate.domain.enums.MemoryCategory;
 import com.soulmate.domain.enums.SenderType;
 import com.soulmate.mapper.CompanionMapper;
@@ -31,8 +25,7 @@ import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.ai.vectorstore.filter.Filter;
 import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -53,11 +46,7 @@ import org.springframework.beans.factory.annotation.Value;
 public class MemoryServiceImpl implements MemoryService {
 
     private final MemoryMapper memoryMapper;
-    private final MemoryTagMapper memoryTagMapper;
     private final MessageMapper messageMapper;
-    private final ConversationMapper conversationMapper;
-    private final CompanionMapper companionMapper;
-    private final CompanionPersonalityMapper personalityMapper;
     private final ChatClient.Builder chatClientBuilder;
     private final ObjectMapper objectMapper;
     private final VectorStore vectorStore;
@@ -71,11 +60,7 @@ public class MemoryServiceImpl implements MemoryService {
                              ChatClient.Builder chatClientBuilder, ObjectMapper objectMapper,
                              @Nullable VectorStore vectorStore) {
         this.memoryMapper = memoryMapper;
-        this.memoryTagMapper = memoryTagMapper;
         this.messageMapper = messageMapper;
-        this.conversationMapper = conversationMapper;
-        this.companionMapper = companionMapper;
-        this.personalityMapper = personalityMapper;
         this.chatClientBuilder = chatClientBuilder;
         this.objectMapper = objectMapper;
         this.vectorStore = vectorStore;
@@ -114,28 +99,23 @@ public class MemoryServiceImpl implements MemoryService {
             wrapper.eq(Memory::getCompanionId, companionId);
         }
 
-        List<Memory> list = memoryMapper.selectList(wrapper);
+        Long total = memoryMapper.selectCount(wrapper);
         MemoryStatsDTO stats = new MemoryStatsDTO();
-        if (list.isEmpty()) {
-            stats.setTotalMemories(0);
+        stats.setTotalMemories(total.intValue());
+        stats.setCategoryCount(MemoryCategory.values().length);
+
+        if (total == 0) {
             stats.setAverageImportance(0.0);
-            stats.setCategoryCount(MemoryCategory.values().length);
             return stats;
         }
 
-        stats.setTotalMemories(list.size());
-        
+        // 直接用 SQL 聚合，避免全量加载
+        List<Memory> list = memoryMapper.selectList(wrapper.select(Memory::getImportance));
         double avg = list.stream()
                 .mapToInt(m -> m.getImportance() != null ? m.getImportance() : 0)
                 .average()
                 .orElse(0.0);
-        avg = Math.round(avg * 10.0) / 10.0;
-        stats.setAverageImportance(avg);
-
-        stats.setCategoryCount(MemoryCategory.values().length);
-
-        log.info("记忆统计数据计算成功: userId={}, companionId={}, total={}, avg={}, categories={}",
-                userId, companionId, stats.getTotalMemories(), stats.getAverageImportance(), stats.getCategoryCount());
+        stats.setAverageImportance(Math.round(avg * 10.0) / 10.0);
 
         return stats;
     }
@@ -169,20 +149,7 @@ public class MemoryServiceImpl implements MemoryService {
         memory.setUpdateTime(LocalDateTime.now());
         memory.setLastAccessTime(LocalDateTime.now());
         memoryMapper.insert(memory);
-
-        // 同步到向量库
-        if (vectorStore != null) {
-            try {
-                Document doc = new Document(memory.getId().toString(), memory.getContent(), Map.of(
-                        "userId", userId,
-                        "companionId", memory.getCompanionId(),
-                        "category", memory.getCategory().getCode()
-                ));
-                vectorStore.add(List.of(doc));
-            } catch (Exception e) {
-                log.warn("手动保存记忆同步向量库失败: {}", memory.getTitle(), e);
-            }
-        }
+        syncToVectorStore(memory, userId);
     }
 
     public List<Memory> getUserMemories(Long userId, Long companionId, MemoryCategory category) {
@@ -219,20 +186,7 @@ public class MemoryServiceImpl implements MemoryService {
         existing.setUserEdited(1);
         existing.setUpdateTime(LocalDateTime.now());
         memoryMapper.updateById(existing);
-
-        // 同步更新向量库
-        if (vectorStore != null) {
-            try {
-                Document doc = new Document(existing.getId().toString(), existing.getContent(), Map.of(
-                        "userId", userId,
-                        "companionId", existing.getCompanionId(),
-                        "category", existing.getCategory().getCode()
-                ));
-                vectorStore.add(List.of(doc));
-            } catch (Exception e) {
-                log.warn("同步更新向量库失败: memoryId={}", memoryId, e);
-            }
-        }
+        syncToVectorStore(existing, userId);
     }
 
     @Override
@@ -243,15 +197,7 @@ public class MemoryServiceImpl implements MemoryService {
             throw new BizException("记忆不存在");
         }
         memoryMapper.deleteById(memoryId);
-
-        // 同步从向量库删除
-        if (vectorStore != null) {
-            try {
-                vectorStore.delete(List.of(memoryId.toString()));
-            } catch (Exception e) {
-                log.warn("从向量库删除记忆失败: memoryId={}", memoryId, e);
-            }
-        }
+        deleteFromVectorStore(memoryId);
     }
 
     @Override
@@ -393,21 +339,8 @@ public class MemoryServiceImpl implements MemoryService {
                     
                     if (count == 0) {
                         memoryMapper.insert(memory);
-                        
-                        // 同步到向量库
-                        if (vectorStore != null) {
-                            try {
-                                Document doc = new Document(memory.getId().toString(), memory.getContent(), Map.of(
-                                        "userId", userId,
-                                        "companionId", companionId,
-                                        "category", category.getCode()
-                                ));
-                                vectorStore.add(List.of(doc));
-                                log.info("提取新记忆并同步向量库成功: title={}", memory.getTitle());
-                            } catch (Exception ve) {
-                                log.warn("记忆同步向量库失败: title={}", memory.getTitle(), ve);
-                            }
-                        }
+                        syncToVectorStore(memory, userId);
+                        log.info("提取新记忆并同步向量库成功: title={}", memory.getTitle());
                     }
                 } catch (Exception e) {
                     log.warn("解析单条记忆失败: {}", item, e);
@@ -425,7 +358,6 @@ public class MemoryServiceImpl implements MemoryService {
         List<Long> memoryIdsFromVector = Collections.emptyList();
         if (vectorStore != null) {
             try {
-                // 构建过滤表达式: userId == userId AND companionId == companionId
                 FilterExpressionBuilder b = new FilterExpressionBuilder();
                 Filter.Expression filterExpression = b.and(
                         b.eq("userId", userId),
@@ -441,7 +373,7 @@ public class MemoryServiceImpl implements MemoryService {
 
                 List<Document> results = vectorStore.similaritySearch(searchRequest);
                 memoryIdsFromVector = results.stream()
-                        .map(doc -> Long.parseLong(doc.getId()))
+                        .map(doc -> VectorIdUtil.fromVectorId(doc.getId()))
                         .collect(Collectors.toList());
 
                 if (!memoryIdsFromVector.isEmpty()) {
@@ -452,7 +384,7 @@ public class MemoryServiceImpl implements MemoryService {
             }
         }
 
-        // 2. 加载完整记忆数据 (如果语义搜索没中，回退到关键词匹配和高重要性记忆)
+        // 2. 加载完整记忆数据
         LambdaQueryWrapper<Memory> wrapper = new LambdaQueryWrapper<Memory>()
                 .eq(Memory::getUserId, userId)
                 .eq(Memory::getCompanionId, companionId)
@@ -462,7 +394,6 @@ public class MemoryServiceImpl implements MemoryService {
         if (!memoryIdsFromVector.isEmpty()) {
             wrapper.in(Memory::getId, memoryIdsFromVector);
         } else {
-            // 回退逻辑：关键词匹配或极高重要性
             wrapper.and(w -> w.like(Memory::getContent, query)
                             .or().like(Memory::getTitle, query)
                             .or().ge(Memory::getImportance, 8))
@@ -471,16 +402,17 @@ public class MemoryServiceImpl implements MemoryService {
         }
 
         List<Memory> memories = memoryMapper.selectList(wrapper);
-        
-        // 3. 更新访问信息
+
+        // 3. 更新访问计数
         if (!memories.isEmpty()) {
-            memories.forEach(m -> {
+            LocalDateTime now = LocalDateTime.now();
+            for (Memory m : memories) {
                 m.setAccessCount(m.getAccessCount() + 1);
-                m.setLastAccessTime(LocalDateTime.now());
+                m.setLastAccessTime(now);
                 memoryMapper.updateById(m);
-            });
+            }
         }
-        
+
         return memories;
     }
 
@@ -510,7 +442,7 @@ public class MemoryServiceImpl implements MemoryService {
                 List<Document> documents = batch.stream()
                         .filter(m -> m.getContent() != null && !m.getContent().isBlank())
                         .map(m -> new Document(
-                                m.getId().toString(),
+                                VectorIdUtil.toVectorId(m.getId()),
                                 m.getContent(),
                                 Map.of(
                                         "userId", m.getUserId(),
@@ -532,8 +464,30 @@ public class MemoryServiceImpl implements MemoryService {
         }
     }
 
-    private String truncate(String text, int maxLength) {
-        if (text == null) return null;
-        return text.length() > maxLength ? text.substring(0, maxLength) + "..." : text;
+    private void syncToVectorStore(Memory memory, Long userId) {
+        if (vectorStore == null) {
+            return;
+        }
+        try {
+            Document doc = new Document(VectorIdUtil.toVectorId(memory.getId()), memory.getContent(), Map.of(
+                    "userId", userId,
+                    "companionId", memory.getCompanionId(),
+                    "category", memory.getCategory() != null ? memory.getCategory().getCode() : ""
+            ));
+            vectorStore.add(List.of(doc));
+        } catch (Exception e) {
+            log.warn("同步向量库失败: memoryId={}, title={}", memory.getId(), memory.getTitle(), e);
+        }
+    }
+
+    private void deleteFromVectorStore(Long memoryId) {
+        if (vectorStore == null) {
+            return;
+        }
+        try {
+            vectorStore.delete(List.of(VectorIdUtil.toVectorId(memoryId)));
+        } catch (Exception e) {
+            log.warn("从向量库删除记忆失败: memoryId={}", memoryId, e);
+        }
     }
 }

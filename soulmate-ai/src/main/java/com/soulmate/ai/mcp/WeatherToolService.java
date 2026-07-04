@@ -20,6 +20,7 @@ import java.util.Map;
 public class WeatherToolService {
 
     private final QweatherProperties qweatherProperties;
+    private final RestClient restClient = RestClient.create();
 
     @Tool(description = "获取指定城市的当前天气和温度。仅在用户明确询问天气、气温、是否下雨等天气相关信息时调用，不要在普通闲聊中主动调用。城市名支持中文或英文，如 Beijing、上海、Tokyo")
     public String getWeather(@ToolParam(description = "城市名称，如 Beijing、上海、Tokyo") String city) {
@@ -62,7 +63,6 @@ public class WeatherToolService {
     private String lookupCityId(String city) {
         String baseUrl = qweatherProperties.getApiHostUrl();
 
-        RestClient restClient = RestClient.create();
         Map<String, Object> response = restClient.get()
                 .uri(baseUrl + "/geo/v2/city/lookup?location={location}&key={key}&number=1",
                         city, qweatherProperties.getApiKey())
@@ -94,7 +94,6 @@ public class WeatherToolService {
     private String fetchCurrentWeather(String cityId, String cityName) {
         String baseUrl = qweatherProperties.getApiHostUrl();
 
-        RestClient restClient = RestClient.create();
         Map<String, Object> response = restClient.get()
                 .uri(baseUrl + "/v7/weather/now?location={location}&key={key}",
                         cityId, qweatherProperties.getApiKey())
@@ -129,7 +128,6 @@ public class WeatherToolService {
     private String fetchWeatherForecast(String cityId, String cityName) {
         String baseUrl = qweatherProperties.getApiHostUrl();
 
-        RestClient restClient = RestClient.create();
         Map<String, Object> response = restClient.get()
                 .uri(baseUrl + "/v7/weather/3d?location={location}&key={key}",
                         cityId, qweatherProperties.getApiKey())

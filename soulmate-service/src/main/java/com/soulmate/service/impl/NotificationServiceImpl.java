@@ -74,25 +74,28 @@ public class NotificationServiceImpl implements NotificationService {
         log.info("主动关心通知已发送: userId={}, companionId={}", userId, companionId);
     }
 
+    private record TimeGreeting(int endHour, String template) {}
+
+    private static final List<TimeGreeting> GREETINGS = List.of(
+            new TimeGreeting(9,  "%s 给你发来了早安问候：新的一天开始了，记得吃早餐哦～"),
+            new TimeGreeting(12, "%s 提醒你：上午工作辛苦了，适当休息一下吧～"),
+            new TimeGreeting(14, "%s 关心你：中午记得好好吃饭，下午才有精神！"),
+            new TimeGreeting(18, "%s 想和你聊聊天，今天过得怎么样？"),
+            new TimeGreeting(22, "%s 在等你：忙了一天了，来聊聊天放松一下吧～"),
+            new TimeGreeting(24, "%s 给你道晚安：今天辛苦了，早点休息哦～")
+    );
+
     /**
      * 生成主动关心内容
      */
     private String generateProactiveCareContent(Companion companion) {
         int hour = LocalDateTime.now().getHour();
         String name = companion.getName();
-
-        if (hour < 9) {
-            return name + " 给你发来了早安问候：新的一天开始了，记得吃早餐哦～";
-        } else if (hour < 12) {
-            return name + " 提醒你：上午工作辛苦了，适当休息一下吧～";
-        } else if (hour < 14) {
-            return name + " 关心你：中午记得好好吃饭，下午才有精神！";
-        } else if (hour < 18) {
-            return name + " 想和你聊聊天，今天过得怎么样？";
-        } else if (hour < 22) {
-            return name + " 在等你：忙了一天了，来聊聊天放松一下吧～";
-        } else {
-            return name + " 给你道晚安：今天辛苦了，早点休息哦～";
+        for (TimeGreeting greeting : GREETINGS) {
+            if (hour < greeting.endHour()) {
+                return String.format(greeting.template(), name);
+            }
         }
+        return String.format(GREETINGS.getLast().template(), name);
     }
 }

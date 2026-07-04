@@ -142,6 +142,14 @@ public class AsrService {
         }
     }
 
+    private static final Map<String, String> MIME_TYPE_MAP = Map.of(
+            ".mp3", "audio/mpeg",
+            ".m4a", "audio/mp4",
+            ".webm", "audio/webm",
+            ".ogg", "audio/ogg",
+            ".flac", "audio/flac"
+    );
+
     /**
      * 根据文件名推断 MIME 类型
      */
@@ -150,16 +158,10 @@ public class AsrService {
             return "audio/wav";
         }
         String lower = fileName.toLowerCase();
-        if (lower.endsWith(".mp3")) {
-            return "audio/mpeg";
-        } else if (lower.endsWith(".m4a")) {
-            return "audio/mp4";
-        } else if (lower.endsWith(".webm")) {
-            return "audio/webm";
-        } else if (lower.endsWith(".ogg")) {
-            return "audio/ogg";
-        } else if (lower.endsWith(".flac")) {
-            return "audio/flac";
+        for (Map.Entry<String, String> entry : MIME_TYPE_MAP.entrySet()) {
+            if (lower.endsWith(entry.getKey())) {
+                return entry.getValue();
+            }
         }
         return "audio/wav";
     }

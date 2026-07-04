@@ -44,3 +44,6 @@ deploy.py
 deploy.bat
 deploy.ps1
 .mimocode
+code-analysis-report.html
+code-analysis-report.md
+models

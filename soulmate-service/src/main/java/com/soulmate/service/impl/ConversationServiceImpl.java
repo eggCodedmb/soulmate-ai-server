@@ -17,15 +17,12 @@ import com.soulmate.domain.dto.ChatRequest;
 import com.soulmate.domain.dto.ChatResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
 
 import java.time.LocalDateTime;
 import java.util.List;
-
-import static com.soulmate.common.constant.RedisConstants.COMPANION_CONTEXT;
 
 @Slf4j
 @Service
@@ -35,7 +32,6 @@ public class ConversationServiceImpl implements ConversationService {
     private final ConversationMapper conversationMapper;
     private final MessageMapper messageMapper;
     private final CompanionMapper companionMapper;
-    private final StringRedisTemplate redisTemplate;
     private final ChatService chatService;
     private final SubscriptionService subscriptionService;
     private final MemoryService memoryService;

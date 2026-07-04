@@ -4,7 +4,6 @@ import com.soulmate.domain.entity.Companion;
 import com.soulmate.domain.entity.CompanionPersonality;
 import com.soulmate.domain.entity.Conversation;
 import com.soulmate.domain.enums.RelationshipType;
-import com.soulmate.domain.enums.SceneMode;
 import com.soulmate.domain.enums.SpeakingStyle;
 import com.soulmate.service.CompanionService;
 import com.soulmate.service.MemoryService;
@@ -19,8 +18,6 @@ import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-
 import static com.soulmate.common.constant.RedisConstants.COMPANION_CONTEXT;
 
 import com.soulmate.service.UserService;
