@@ -10,11 +10,11 @@ spring:
     virtual:
       enabled: true
 
-  # 数据源
+  # 数据源（默认值用于本地 IDE 调试，Docker/生产通过环境变量覆盖）
   datasource:
-    url: ${DB_URL}
-    username: ${DB_USERNAME}
-    password: ${DB_PASSWORD}
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/soulmate}
+    username: ${DB_USERNAME:soulmate}
+    password: ${DB_PASSWORD:soulmate2026}
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 20
@@ -25,8 +25,9 @@ spring:
   # Redis
   data:
     redis:
-      host: ${REDIS_HOST}
-      port: ${REDIS_PORT}
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:soulmate2026}
       database: 0
       timeout: 5000ms
       lettuce:
@@ -52,8 +53,8 @@ spring:
   mail:
     host: smtp.qq.com
     port: 587
-    username: ${MAIL_USERNAME}
-    password: ${MAIL_PASSWORD}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
     properties:
       mail:
         smtp:
@@ -64,8 +65,8 @@ spring:
   # Spring AI 配置（mimo-v2.5-pro，OpenAI 兼容 API）
   ai:
     openai:
-      api-key: ${MIMO_API_KEY}
-      base-url: ${MIMO_BASE_URL}
+      api-key: ${MIMO_API_KEY:}
+      base-url: ${MIMO_BASE_URL:https://api.xiaomimimo.com/v1}
       chat:
         model: mimo-v2.5-pro
         max-tokens: 2048
@@ -73,9 +74,9 @@ spring:
     embedding:
       transformer:
         onnx:
-          modelUri: file:///D:/Code/models/e5-small-v2/model.onnx
+          modelUri: file:///models/e5-small-v2/model.onnx
         tokenizer:
-          uri: file:///D:/Code/models/e5-small-v2/tokenizer.json
+          uri: file:///models/e5-small-v2/tokenizer.json
     vectorstore:
       pgvector:
         table-name: memory_vectors
@@ -100,39 +101,39 @@ mybatis-plus:
 # SoulMate 自定义配置
 soulmate:
   jwt:
-    secret: ${JWT_SECRET}
+    secret: ${JWT_SECRET:soulmate-jwt-secret-key-2026-change-in-production}
     expire-ms: 604800000  # 7天
 
   ai:
     default-model: mimo-v2.5-pro
     call-model: mimo-v2.5-flash
-    base-url: ${MIMO_BASE_URL}
-    api-key: ${MIMO_API_KEY}
+    base-url: ${MIMO_BASE_URL:https://api.xiaomimimo.com/v1}
+    api-key: ${MIMO_API_KEY:}
     asr:
       enabled: true
       model: mimo-v2.5-asr
-      base-url: ${MIMO_BASE_URL}
+      base-url: ${MIMO_BASE_URL:https://api.xiaomimimo.com/v1}
       max-size-mb: 25
 
   # 和风天气配置
   qweather:
-    api-key: ${QWEATHER_API_KEY}
-    api-host-url: ${QWEATHER_API_HOST}
+    api-key: ${QWEATHER_API_KEY:}
+    api-host-url: ${QWEATHER_API_HOST:https://devapi.qweather.com}
   # 文件上传配置
   file:
-    base-dir: D:/Code/soulmate-ai-server/online
+    base-dir: ${FILE_BASE_DIR:./data/uploads}
     allowed-types: jpg,jpeg,png,gif,webp,bmp,pdf,doc,docx,xls,xlsx,ppt,pptx,txt,mp3,mp4,wav
     max-size-mb: 10
     url-prefix: /files
 
   # 支付宝沙箱配置
   alipay:
-    app-id: ${ALIPAY_APP_ID}
-    private-key: ${ALIPAY_PRIVATE_KEY}
-    alipay-public-key: ${ALIPAY_PUBLIC_KEY}
+    app-id: ${ALIPAY_APP_ID:}
+    private-key: ${ALIPAY_PRIVATE_KEY:}
+    alipay-public-key: ${ALIPAY_PUBLIC_KEY:}
     gateway: https://openapi-sandbox.dl.alipaydev.com/gateway.do
-    notify-url: ${ALIPAY_NOTIFY_URL}
-    return-url: ${ALIPAY_RETURN_URL}
+    notify-url: ${ALIPAY_NOTIFY_URL:}
+    return-url: ${ALIPAY_RETURN_URL:}
 
 # Actuator
 management:
@@ -143,6 +144,9 @@ management:
   endpoint:
     health:
       show-details: when-authorized
+  health:
+    mail:
+      enabled: false
 
 # 日志
 logging:

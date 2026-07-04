@@ -10,7 +10,8 @@ import org.springframework.scheduling.annotation.EnableScheduling;
  * SoulMate AI 启动入口
  */
 @SpringBootApplication(exclude = {
-        org.springframework.ai.model.ollama.autoconfigure.OllamaChatAutoConfiguration.class
+        org.springframework.ai.model.ollama.autoconfigure.OllamaChatAutoConfiguration.class,
+        org.springframework.ai.vectorstore.pgvector.autoconfigure.PgVectorStoreAutoConfiguration.class
 })
 @EnableAsync
 @EnableScheduling

@@ -25,12 +25,20 @@ Thumbs.db
 
 # Environment
 .env
+.env.local
+.env.production
+.env.staging
 *.env.local
 set-env-vars.ps1
 
+# Secrets
+*.pem
+*.key
+服务器信息.txt
 
 online
 milvus-lite
 deploy.py
 deploy.bat
 deploy.ps1
+.mimocode

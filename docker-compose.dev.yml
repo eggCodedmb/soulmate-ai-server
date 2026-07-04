@@ -1,0 +1,67 @@
+# =============================================
+# SoulMate AI - 本地开发基础设施
+# 用途：PostgreSQL + Redis + Nginx，应用在 IDE 中调试运行
+# 命令：docker compose -f docker-compose.dev.yml up -d
+# =============================================
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: soulmate-postgres-dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: soulmate
+      POSTGRES_USER: soulmate
+      POSTGRES_PASSWORD: soulmate2026
+      TZ: Asia/Shanghai
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+      - ./sql/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U soulmate"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - soulmate-dev-net
+
+  redis:
+    image: redis:7-alpine
+    container_name: soulmate-redis-dev
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass soulmate2026
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_dev_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "soulmate2026", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - soulmate-dev-net
+
+  nginx:
+    image: nginx:alpine
+    container_name: soulmate-nginx-dev
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d.dev:/etc/nginx/conf.d:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - soulmate-dev-net
+
+volumes:
+  postgres_dev_data:
+  redis_dev_data:
+
+networks:
+  soulmate-dev-net:
+    driver: bridge
