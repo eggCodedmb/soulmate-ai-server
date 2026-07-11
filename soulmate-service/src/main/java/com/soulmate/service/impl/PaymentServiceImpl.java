@@ -5,7 +5,9 @@ import com.alipay.api.AlipayApiException;
 import com.alipay.api.AlipayClient;
 import com.alipay.api.DefaultAlipayClient;
 import com.alipay.api.internal.util.AlipaySignature;
-import com.alipay.api.request.AlipayTradePagePayRequest;
+import com.alipay.api.request.AlipayTradeAppPayRequest;
+import com.alipay.api.request.AlipayTradeQueryRequest;
+import com.alipay.api.response.AlipayTradeQueryResponse;
 import com.alibaba.fastjson2.JSONObject;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.soulmate.common.config.AlipayProperties;
@@ -92,8 +94,8 @@ public class PaymentServiceImpl implements PaymentService {
         log.info("支付订单创建成功: orderNo={}, userId={}, planId={}, amount={}",
                 order.getOrderNo(), userId, planId, order.getAmount());
 
-        // 构建支付宝支付请求
-        String payForm = doAlipayTradePagePay(order, plan);
+        // 构建支付宝 App 支付签名串
+        String payForm = doAlipayTradeAppPay(order, plan);
 
         return PaymentCreateResponse.builder()
                 .orderNo(order.getOrderNo())
@@ -168,34 +170,60 @@ public class PaymentServiceImpl implements PaymentService {
     }
 
     @Override
+    @Transactional
     public PaymentOrder getOrderStatus(String orderNo) {
-        return paymentOrderMapper.selectOne(
+        PaymentOrder order = paymentOrderMapper.selectOne(
                 new LambdaQueryWrapper<PaymentOrder>()
                         .eq(PaymentOrder::getOrderNo, orderNo));
+
+        if (order != null && order.getPaymentStatus() == PaymentStatus.PENDING) {
+            // 主动向支付宝查询订单状态，防止在本地开发测试（如 localhost 无公网IP）时，支付宝异步回调无法送达导致状态不更新
+            try {
+                AlipayTradeQueryRequest queryRequest = new AlipayTradeQueryRequest();
+                JSONObject bizContent = new JSONObject();
+                bizContent.put("out_trade_no", orderNo);
+                queryRequest.setBizContent(bizContent.toString());
+
+                AlipayTradeQueryResponse queryResponse = alipayClient.execute(queryRequest);
+                if (queryResponse.isSuccess()) {
+                    String tradeStatus = queryResponse.getTradeStatus();
+                    if ("TRADE_SUCCESS".equals(tradeStatus) || "TRADE_FINISHED".equals(tradeStatus)) {
+                        log.info("主动查询支付宝订单成功，订单已支付: orderNo={}, tradeNo={}", orderNo, queryResponse.getTradeNo());
+                        handlePaymentCallback(orderNo, queryResponse.getTradeNo());
+                        // 重新获取已更新的订单状态
+                        order = paymentOrderMapper.selectById(order.getId());
+                    }
+                }
+            } catch (AlipayApiException e) {
+                log.error("主动查询支付宝订单异常: orderNo={}", orderNo, e);
+            }
+        }
+
+        return order;
     }
 
     /**
-     * 调用支付宝电脑网站支付接口
+     * 调用支付宝 APP 支付接口，生成签名订单字符串
      */
-    private String doAlipayTradePagePay(PaymentOrder order, SubscriptionPlan plan) {
-        AlipayTradePagePayRequest request = new AlipayTradePagePayRequest();
+    private String doAlipayTradeAppPay(PaymentOrder order, SubscriptionPlan plan) {
+        AlipayTradeAppPayRequest request = new AlipayTradeAppPayRequest();
         request.setNotifyUrl(alipayProperties.getNotifyUrl());
-        request.setReturnUrl(alipayProperties.getReturnUrl());
 
         // 业务参数
         JSONObject bizContent = new JSONObject();
         bizContent.put("out_trade_no", order.getOrderNo());
         bizContent.put("total_amount", order.getAmount().toPlainString());
         bizContent.put("subject", "SoulMate AI - " + plan.getPlanName() + " 套餐");
-        bizContent.put("product_code", "FAST_INSTANT_TRADE_PAY");
+        bizContent.put("product_code", "QUICK_MSECURITY_PAY");
         request.setBizContent(bizContent.toString());
 
         try {
-            String form = alipayClient.pageExecute(request).getBody();
-            log.info("支付宝支付表单生成成功: orderNo={}", order.getOrderNo());
-            return form;
+            // 使用 sdkExecute 得到签名订单串，而非 pageExecute 得到 HTML 表单
+            String orderString = alipayClient.sdkExecute(request).getBody();
+            log.info("支付宝 APP 支付签名串生成成功: orderNo={}", order.getOrderNo());
+            return orderString;
         } catch (AlipayApiException e) {
-            log.error("支付宝支付表单生成失败: orderNo={}", order.getOrderNo(), e);
+            log.error("支付宝 APP 支付签名串生成失败: orderNo={}", order.getOrderNo(), e);
             throw new BizException(ResultCode.PAYMENT_FAILED);
         }
     }
