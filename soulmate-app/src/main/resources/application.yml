@@ -8,6 +8,8 @@ spring:
   autoconfigure:
     exclude:
       - org.springframework.ai.autoconfigure.vectorstore.transformer.TransformersEmbeddingModelAutoConfiguration
+      - org.springframework.ai.autoconfigure.transformers.TransformersEmbeddingModelAutoConfiguration
+      - org.springframework.ai.model.transformers.autoconfigure.TransformersEmbeddingModelAutoConfiguration
 
   # 虚拟线程（Java 21）
   threads:

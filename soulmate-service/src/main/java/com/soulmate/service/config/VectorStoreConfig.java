@@ -7,6 +7,7 @@ import org.springframework.ai.vectorstore.pgvector.PgVectorStore;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import javax.sql.DataSource;
@@ -23,7 +24,7 @@ public class VectorStoreConfig {
     private String tableName;
 
     @Bean
-    public VectorStore vectorStore(JdbcTemplate jdbcTemplate, EmbeddingModel embeddingModel) {
+    public VectorStore vectorStore(JdbcTemplate jdbcTemplate, @Qualifier("openAiEmbeddingModel") EmbeddingModel embeddingModel) {
         log.info("初始化 PgVector 向量数据库, 表名: {}", tableName);
 
         PgVectorStore vectorStore = PgVectorStore.builder(jdbcTemplate, embeddingModel)
