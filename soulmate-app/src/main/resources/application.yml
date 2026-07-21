@@ -5,6 +5,10 @@ spring:
   application:
     name: soulmate-ai
 
+  autoconfigure:
+    exclude:
+      - org.springframework.ai.autoconfigure.vectorstore.transformer.TransformersEmbeddingModelAutoConfiguration
+
   # 虚拟线程（Java 21）
   threads:
     virtual:
@@ -71,12 +75,12 @@ spring:
         model: mimo-v2.5-pro
         max-tokens: 2048
         temperature: 0.7
-    embedding:
-      transformer:
-        onnx:
-          modelUri: file:///models/e5-small-v2/model.onnx
-        tokenizer:
-          uri: file:///models/e5-small-v2/tokenizer.json
+      embedding:
+        enabled: true
+        base-url: ${SILICONFLOW_EMBEDDING_BASE_URL:https://api.siliconflow.cn/v1}
+        api-key: ${SILICONFLOW_EMBEDDING_API_KEY:sk-lmiboizesdzsflmfcskasmeemhwdmmbrirpcwubevcraacji}
+        options:
+          model: BAAI/bge-large-zh-v1.5
     vectorstore:
       pgvector:
         table-name: memory_vectors
