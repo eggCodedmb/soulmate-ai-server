@@ -12,7 +12,6 @@ import com.soulmate.service.ConversationService;
 import com.soulmate.service.SubscriptionService;
 import com.soulmate.service.ChatService;
 import com.soulmate.service.MemoryService;
-import com.soulmate.service.CompanionReminderService;
 import com.soulmate.domain.dto.ChatRequest;
 import com.soulmate.domain.dto.ChatResponse;
 import lombok.RequiredArgsConstructor;
@@ -35,7 +34,6 @@ public class ConversationServiceImpl implements ConversationService {
     private final ChatService chatService;
     private final SubscriptionService subscriptionService;
     private final MemoryService memoryService;
-    private final CompanionReminderService companionReminderService;
 
     @Override
     @Transactional
@@ -163,10 +161,7 @@ public class ConversationServiceImpl implements ConversationService {
                 .doOnComplete(() -> {
                     String aiReply = fullContent.toString();
                     if (!aiReply.isBlank()) {
-                        // 1. 解析并自动创建定时提醒
-                        companionReminderService.parseAndCreateReminder(userId, companion.getId(), aiReply);
-
-                        // 2. 清洗过滤控制指令标签和 tool call 残留
+                        // 1. 清洗过滤控制指令标签和 tool call 残留
                         String cleanReply = aiReply
                                 .replaceAll("<command.*?>.*?</command>", "")
                                 .replaceAll("(?s)<tool_call>.*?</tool_call>", "")
@@ -230,10 +225,7 @@ public class ConversationServiceImpl implements ConversationService {
                 .doOnComplete(() -> {
                     String aiReply = fullContent.toString();
                     if (!aiReply.isBlank()) {
-                        // 1. 解析并自动创建定时提醒
-                        companionReminderService.parseAndCreateReminder(userId, companion.getId(), aiReply);
-
-                        // 2. 清洗过滤控制指令标签和 tool call 残流
+                        // 1. 清洗过滤控制指令标签和 tool call 残流
                         String cleanReply = aiReply
                                 .replaceAll("<command.*?>.*?</command>", "")
                                 .replaceAll("(?s)<tool_call>.*?</tool_call>", "")
@@ -299,10 +291,7 @@ public class ConversationServiceImpl implements ConversationService {
         Companion companion = companionMapper.selectById(request.getCompanionId());
         String aiReply = chatService.chatSync(userId, conversation, companion, request.getContent(), request);
 
-        // 1. 解析并自动创建定时提醒
-        companionReminderService.parseAndCreateReminder(userId, companion.getId(), aiReply);
-
-        // 2. 清洗过滤控制指令标签和 tool call 残留
+        // 1. 清洗过滤控制指令标签和 tool call 残留
         String cleanReply = aiReply
                 .replaceAll("<command.*?>.*?</command>", "")
                 .replaceAll("(?s)<tool_call>.*?</tool_call>", "")

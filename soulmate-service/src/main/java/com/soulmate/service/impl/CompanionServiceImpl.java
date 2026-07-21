@@ -25,13 +25,11 @@ public class CompanionServiceImpl extends ServiceImpl<CompanionMapper, Companion
     private final CompanionPersonalityMapper personalityMapper;
     private final CompanionVoiceMapper voiceMapper;
     private final CompanionAvatarMapper avatarMapper;
-    private final CompanionReminderMapper reminderMapper;
     private final ConversationMapper conversationMapper;
     private final MessageMapper messageMapper;
     private final MemoryMapper memoryMapper;
     private final MemoryTagMapper memoryTagMapper;
     private final NotificationMapper notificationMapper;
-    private final ScheduleReminderMapper scheduleReminderMapper;
     private final SubscriptionService subscriptionService;
 
     @Override
@@ -137,10 +135,6 @@ public class CompanionServiceImpl extends ServiceImpl<CompanionMapper, Companion
         avatarMapper.delete(new LambdaQueryWrapper<CompanionAvatar>()
                 .eq(CompanionAvatar::getCompanionId, companionId));
 
-        // 伴侣定时提醒
-        reminderMapper.delete(new LambdaQueryWrapper<CompanionReminder>()
-                .eq(CompanionReminder::getCompanionId, companionId));
-
         // 3. 级联删除对话与消息
         List<Conversation> conversations = conversationMapper.selectList(
                 new LambdaQueryWrapper<Conversation>()
@@ -171,9 +165,6 @@ public class CompanionServiceImpl extends ServiceImpl<CompanionMapper, Companion
         notificationMapper.delete(new LambdaQueryWrapper<Notification>()
                 .eq(Notification::getCompanionId, companionId));
         
-        scheduleReminderMapper.delete(new LambdaQueryWrapper<ScheduleReminder>()
-                .eq(ScheduleReminder::getCompanionId, companionId));
-
         log.info("伴侣及其关联数据已成功级联删除: companionId={}, userId={}", companionId, userId);
     }
 

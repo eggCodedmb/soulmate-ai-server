@@ -50,7 +50,9 @@ public class SecurityConfig {
             "/api/alipay/notify",
             "/files/**",
             "/error",
-            "/api/memory/admin/**"
+            "/api/memory/admin/**",
+            "/api/tts/**",
+            "/api/asr/**"
     );
 
     @Bean
