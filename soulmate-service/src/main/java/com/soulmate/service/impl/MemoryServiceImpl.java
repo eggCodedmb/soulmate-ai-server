@@ -403,14 +403,32 @@ public class MemoryServiceImpl implements MemoryService {
 
         List<Memory> memories = memoryMapper.selectList(wrapper);
 
-        // 3. 更新访问计数
+        // 3. 异步更新访问计数，避免阻塞聊天主线程
         if (!memories.isEmpty()) {
             LocalDateTime now = LocalDateTime.now();
-            for (Memory m : memories) {
-                m.setAccessCount(m.getAccessCount() + 1);
-                m.setLastAccessTime(now);
-                memoryMapper.updateById(m);
-            }
+            List<Memory> updateList = memories.stream()
+                    .map(m -> {
+                        Memory updateObj = new Memory();
+                        updateObj.setId(m.getId());
+                        updateObj.setAccessCount(m.getAccessCount() + 1);
+                        updateObj.setLastAccessTime(now);
+                        // 同时同步更新当前返回的对象，供当前请求展示/日志使用
+                        m.setAccessCount(m.getAccessCount() + 1);
+                        m.setLastAccessTime(now);
+                        return updateObj;
+                    })
+                    .collect(Collectors.toList());
+
+            java.util.concurrent.CompletableFuture.runAsync(() -> {
+                try {
+                    for (Memory m : updateList) {
+                        memoryMapper.updateById(m);
+                    }
+                    log.debug("异步更新记忆访问计数完成: count={}", updateList.size());
+                } catch (Exception e) {
+                    log.warn("异步更新记忆访问计数失败", e);
+                }
+            });
         }
 
         return memories;
