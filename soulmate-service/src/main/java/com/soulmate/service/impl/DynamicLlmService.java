@@ -76,16 +76,25 @@ public class DynamicLlmService {
                         .build();
             }
 
-            // Spring AI 2.0.0: baseUrl 和 apiKey 移入 OpenAiChatOptions，无需直接创建 HTTP 客户端
-            log.info("创建动态 OpenAI ChatModel: baseUrl={}, model={}", baseUrl, effectiveModel);
+            // 规范化 Base URL，确保 OpenAI 兼容协议包含 /v1 路径
+            String normalizedUrl = baseUrl.trim();
+            if (!normalizedUrl.endsWith("/v1") && !normalizedUrl.endsWith("/v1/")) {
+                normalizedUrl = normalizedUrl.replaceAll("/+$", "") + "/v1";
+            }
+
+            log.info("创建动态 OpenAI ChatModel: rawUrl={}, normalizedUrl={}, model={}", baseUrl, normalizedUrl, effectiveModel);
             String effectiveKey = (apiKey != null && !apiKey.isEmpty()) ? apiKey : "no-key";
 
             OpenAiChatOptions options = OpenAiChatOptions.builder()
-                    .baseUrl(baseUrl)
+                    .baseUrl(normalizedUrl)
                     .apiKey(effectiveKey)
                     .model(effectiveModel)
                     .temperature(0.7)
                     .maxTokens(2048)
+                    .timeout(java.time.Duration.ofMinutes(10)) // 延长超时时间为 10 分钟，适应本地大模型首字推理耗时
+                    .streamOptions(OpenAiChatOptions.StreamOptions.builder()
+                            .includeUsage(false)
+                            .build())
                     .build();
 
             return OpenAiChatModel.builder()

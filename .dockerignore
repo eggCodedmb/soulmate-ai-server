@@ -8,8 +8,12 @@
 *.iml
 
 # Build
-**/target/
-!soulmate-app/target/*.jar
+soulmate-common/target
+soulmate-domain/target
+soulmate-mapper/target
+soulmate-service/target
+soulmate-ai/target
+soulmate-web/target
 
 # Docker
 docker-compose.yml

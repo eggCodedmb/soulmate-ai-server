@@ -35,6 +35,9 @@ public class TtsController {
         if (profileId == null || profileId.isBlank()) {
             profileId = (String) body.get("voiceId");
         }
+        if (profileId == null || profileId.isBlank()) {
+            profileId = (String) body.get("profile_id");
+        }
 
         if (text == null || text.isBlank()) {
             return ResponseEntity.badRequest().build();

@@ -78,7 +78,19 @@ public class ChatServiceImpl implements ChatService {
                     .map(response -> {
                         String content = "";
                         if (response.getResult() != null && response.getResult().getOutput() != null) {
-                            content = response.getResult().getOutput().getText();
+                            org.springframework.ai.chat.messages.AssistantMessage output = response.getResult().getOutput();
+                            content = output.getText();
+
+                            // 兼容推理/思考模型（如 Gemma / DeepSeek-R1）输出的 reasoningContent
+                            if ((content == null || content.isEmpty()) && output.getMetadata() != null) {
+                                Object reasoning = output.getMetadata().get("reasoningContent");
+                                if (reasoning == null) {
+                                    reasoning = output.getMetadata().get("reasoning_content");
+                                }
+                                if (reasoning != null) {
+                                    content = reasoning.toString();
+                                }
+                            }
                         }
 
                         if (content == null || content.isEmpty()) {
@@ -92,7 +104,7 @@ public class ChatServiceImpl implements ChatService {
                         fullContent.append(content);
 
                         int count = chunkCount.incrementAndGet();
-                        log.debug("SSE Chunk #{}: size={}, content=[{}]", count, content.length(),
+                        log.info("SSE Chunk #{}: size={}, content=[{}]", count, content.length(),
                                 content.replace("\n", "\\n"));
 
                         return ChatResponse.builder()
@@ -101,6 +113,7 @@ public class ChatServiceImpl implements ChatService {
                                 .done(false)
                                 .build();
                     })
+                    .filter(res -> (res.getContent() != null && !res.getContent().isEmpty()) || res.isDone() || res.getError() != null)
                     .doOnComplete(() -> {
                         log.info("SSE流完成: userId={}, conversationId={}, totalChunks={}",
                                 userId, conversation.getId(), chunkCount.get());
@@ -186,8 +199,8 @@ public class ChatServiceImpl implements ChatService {
         if (model == chatModel) {
             return chatClient;
         }
+        // 动态/自定义模型（如 LM Studio）：不强行绑定 defaultTools，避免包含 tools 参数导致 LM Studio/Spring AI 产生流式缓冲
         return ChatClient.builder(model)
-                .defaultTools(weatherToolService, timeToolService)
                 .build();
     }
 }
