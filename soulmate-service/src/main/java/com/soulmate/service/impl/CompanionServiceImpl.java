@@ -88,7 +88,6 @@ public class CompanionServiceImpl extends ServiceImpl<CompanionMapper, Companion
     @Override
     @Transactional
     public void updateCompanion(Long userId, Long companionId, Companion companion, List<CompanionPersonality> personalities) {
-        Companion existing = getCompanionDetail(userId, companionId);
         companion.setId(companionId);
         companion.setUserId(userId);
         companion.setUpdateTime(LocalDateTime.now());

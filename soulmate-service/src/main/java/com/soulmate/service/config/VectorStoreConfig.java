@@ -10,7 +10,6 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-import javax.sql.DataSource;
 
 /**
  * PgVector 向量数据库配置

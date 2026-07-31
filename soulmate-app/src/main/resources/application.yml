@@ -1,5 +1,5 @@
 server:
-  port: 8080
+  port: ${APP_PORT:8080}
 
 spring:
   application:
@@ -16,11 +16,11 @@ spring:
     virtual:
       enabled: true
 
-  # 数据源（默认值用于本地 IDE 调试，Docker/生产通过环境变量覆盖）
+  # 数据源（优先使用 DB_URL，若无则由 POSTGRES_HOST/POSTGRES_PORT/POSTGRES_DB 拼接）
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/soulmate}
-    username: ${DB_USERNAME:soulmate}
-    password: ${DB_PASSWORD:soulmate2026}
+    url: ${DB_URL:jdbc:postgresql://${POSTGRES_HOST:154.209.5.177}:${POSTGRES_PORT:5432}/${POSTGRES_DB:soulmate}}
+    username: ${DB_USERNAME:${POSTGRES_USER:soulmate}}
+    password: ${DB_PASSWORD:${POSTGRES_PASSWORD:soulmate2026}}
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 20
@@ -31,10 +31,10 @@ spring:
   # Redis
   data:
     redis:
-      host: ${REDIS_HOST:localhost}
+      host: ${REDIS_HOST:154.209.5.177}
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:soulmate2026}
-      database: 0
+      database: ${REDIS_DATABASE:0}
       timeout: 5000ms
       lettuce:
         pool:
@@ -57,8 +57,8 @@ spring:
 
   # 邮件服务
   mail:
-    host: smtp.qq.com
-    port: 587
+    host: ${MAIL_HOST:smtp.qq.com}
+    port: ${MAIL_PORT:587}
     username: ${MAIL_USERNAME:}
     password: ${MAIL_PASSWORD:}
     properties:
@@ -74,7 +74,7 @@ spring:
       api-key: ${MIMO_API_KEY:}
       base-url: ${MIMO_BASE_URL:https://api.xiaomimimo.com/v1}
       chat:
-        model: mimo-v2.5-pro
+        model: ${MIMO_MODEL:mimo-v2.5-pro}
         max-tokens: 2048
         temperature: 0.7
       embedding:
@@ -82,7 +82,7 @@ spring:
         base-url: ${SILICONFLOW_EMBEDDING_BASE_URL:https://api.siliconflow.cn/v1}
         api-key: ${SILICONFLOW_EMBEDDING_API_KEY:sk-lmiboizesdzsflmfcskasmeemhwdmmbrirpcwubevcraacji}
         options:
-          model: BAAI/bge-large-zh-v1.5
+          model: ${SILICONFLOW_EMBEDDING_MODEL:BAAI/bge-large-zh-v1.5}
     vectorstore:
       pgvector:
         table-name: memory_vectors
@@ -108,16 +108,16 @@ mybatis-plus:
 soulmate:
   jwt:
     secret: ${JWT_SECRET:soulmate-jwt-secret-key-2026-change-in-production}
-    expire-ms: 604800000  # 7天
+    expire-ms: ${JWT_EXPIRE_MS:604800000}  # 7天
 
   ai:
-    default-model: mimo-v2.5-pro
-    call-model: mimo-v2.5-flash
+    default-model: ${MIMO_MODEL:mimo-v2.5-pro}
+    call-model: ${MIMO_CALL_MODEL:mimo-v2.5-flash}
     base-url: ${MIMO_BASE_URL:https://api.xiaomimimo.com/v1}
     api-key: ${MIMO_API_KEY:}
     asr:
       enabled: true
-      model: mimo-v2.5-asr
+      model: ${MIMO_ASR_MODEL:mimo-v2.5-asr}
       base-url: ${MIMO_BASE_URL:https://api.xiaomimimo.com/v1}
       max-size-mb: 25
 
@@ -137,7 +137,7 @@ soulmate:
     app-id: ${ALIPAY_APP_ID:}
     private-key: ${ALIPAY_PRIVATE_KEY:}
     alipay-public-key: ${ALIPAY_PUBLIC_KEY:}
-    gateway: https://openapi-sandbox.dl.alipaydev.com/gateway.do
+    gateway: ${ALIPAY_GATEWAY:https://openapi-sandbox.dl.alipaydev.com/gateway.do}
     notify-url: ${ALIPAY_NOTIFY_URL:}
     return-url: ${ALIPAY_RETURN_URL:}
 
